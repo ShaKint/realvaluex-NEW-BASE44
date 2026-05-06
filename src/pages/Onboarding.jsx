@@ -78,8 +78,21 @@ export default function Onboarding() {
   }
 
   if (!user) {
-    base44.auth.redirectToLogin(window.location.href);
-    return null;
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-slate-950">
+        <div className="text-center">
+          <div className="text-white/60 text-sm mb-4">
+            {lang === 'he' ? 'יש להתחבר כדי להמשיך' : 'Please log in to continue'}
+          </div>
+          <button
+            onClick={() => base44.auth.redirectToLogin(window.location.href)}
+            className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-semibold transition-all"
+          >
+            {lang === 'he' ? 'התחברות' : 'Log In'}
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
