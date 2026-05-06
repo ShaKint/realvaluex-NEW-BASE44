@@ -10,36 +10,13 @@ Deno.serve(async (req) => {
 
     if (!ticker) return Response.json({ error: 'ticker required' }, { status: 400 });
 
-    const prompt = `
-You are a professional equity analyst using the RealValueX™ valuation framework.
-
-Analyze the stock: ${ticker} (${company_name || ticker})
-
-User-provided financials (may be empty — use your knowledge if so):
-${JSON.stringify(financials || {}, null, 2)}
-
-Perform a comprehensive intrinsic value analysis. Return structured JSON with:
-
-1. company_summary: 2-3 sentence business overview
-2. dcf: { intrinsic_value, assumptions: { revenue_growth_rate, ebit_margin, terminal_growth_rate, discount_rate }, explanation }
-3. pe_valuation: { fair_value, sector_avg_pe, company_pe, explanation }
-4. graham_number: { value, eps, book_value_per_share, explanation }
-5. consensus_value: weighted average of the 3 methods
-6. current_price_estimate: your best estimate of the current market price
-7. upside_pct: ((consensus_value - current_price_estimate) / current_price_estimate * 100)
-8. classification: "A" | "B" | "C" | "D"  (A = deep value, B = fair, C = slightly overvalued, D = overvalued)
-9. classification_rationale: short explanation
-10. risks: array of 3 key risks
-11. catalysts: array of 3 key upside catalysts
-12. recommendation: "Strong Buy" | "Buy" | "Hold" | "Sell" | "Strong Sell"
-13. confidence: 1-10
-
-All monetary values in USD. Be realistic and data-driven.
-`;
+    const prompt = `You are an equity analyst. Analyze stock: ${ticker}.
+User financials (use your knowledge if empty): ${JSON.stringify(financials || {})}.
+Return JSON: company_summary (1-2 sentences), dcf {intrinsic_value, assumptions:{revenue_growth_rate,ebit_margin,terminal_growth_rate,discount_rate}, explanation (1 sentence)}, pe_valuation {fair_value, sector_avg_pe, company_pe, explanation (1 sentence)}, graham_number {value, eps, book_value_per_share, explanation (1 sentence)}, consensus_value, current_price_estimate, upside_pct, classification (A/B/C/D), classification_rationale (1 sentence), risks (3 items), catalysts (3 items), recommendation (Strong Buy/Buy/Hold/Sell/Strong Sell), confidence (1-10). USD values. Be concise.`;
 
     const result = await base44.integrations.Core.InvokeLLM({
       prompt,
-      model: 'claude_sonnet_4_6',
+      model: 'gpt_5_4',
       response_json_schema: {
         type: 'object',
         properties: {
