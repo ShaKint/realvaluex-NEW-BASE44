@@ -7,6 +7,11 @@ import {
   Brain, BarChart3, ScanSearch, Star, TrendingDown, Zap,
   Settings, Shield, Menu, X, LogOut, User, ChevronRight, ChevronLeft
 } from 'lucide-react';
+import MarketTicker from '@/components/dashboard/MarketTicker';
+import PortfolioChart from '@/components/dashboard/PortfolioChart';
+import TopOpportunities from '@/components/dashboard/TopOpportunities';
+import MarketNews from '@/components/dashboard/MarketNews';
+import QuickStats from '@/components/dashboard/QuickStats';
 
 const navItems = [
   { key: 'dashboard', icon: BarChart3, path: '/dashboard' },
@@ -135,51 +140,49 @@ export default function Dashboard() {
         </header>
 
         {/* Dashboard content */}
-        <div className="flex-1 p-4 sm:p-6">
-          {/* Welcome card */}
-          <div className="mb-6 p-6 rounded-2xl bg-gradient-to-r from-indigo-900/40 to-violet-900/40 border border-indigo-500/20">
-            <h2 className="text-xl font-bold text-white mb-1">
-              {lang === 'he' ? `שלום, ${user?.full_name?.split(' ')[0] || ''}!` : `Hello, ${user?.full_name?.split(' ')[0] || ''}!`}
-            </h2>
-            <p className="text-white/40 text-sm">
-              {profile
-                ? (lang === 'he' ? `פרופיל: ${profile.investor_type === 'experienced' ? 'משקיע מנוסה' : 'משקיע מתחיל'} · סיכון: ${profile.risk_tolerance}` : `Profile: ${profile.investor_type} · Risk: ${profile.risk_tolerance}`)
-                : (lang === 'he' ? 'ברוך הבא! השלם את ה-Onboarding כדי להתאים אישית.' : 'Welcome! Complete onboarding to personalize.')}
-            </p>
-          </div>
-
-          {/* Stats */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            {[
-              { label: lang === 'he' ? 'מניות בתיק' : 'Portfolio Stocks', value: '—', color: 'text-indigo-400' },
-              { label: lang === 'he' ? 'Wish List' : 'Wish List', value: '—', color: 'text-amber-400' },
-              { label: lang === 'he' ? 'הזדמנויות' : 'Opportunities', value: '—', color: 'text-emerald-400' },
-              { label: lang === 'he' ? 'ניתוחים היום' : "Today's Analyses", value: '—', color: 'text-violet-400' },
-            ].map((stat, i) => (
-              <div key={i} className="p-4 rounded-2xl bg-white/5 border border-white/5">
-                <div className={`text-2xl font-bold mb-1 ${stat.color}`}>{stat.value}</div>
-                <div className="text-white/40 text-sm">{stat.label}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* Modules grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {navItems.slice(1).map(({ key, icon: Icon, path }) => (
+        <div className="flex-1 p-4 sm:p-6 space-y-5">
+          {/* Welcome */}
+          <div className="p-5 rounded-2xl bg-gradient-to-r from-indigo-900/40 to-violet-900/40 border border-indigo-500/20 flex items-center justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-bold text-white">
+                {lang === 'he' ? `שלום, ${user?.full_name?.split(' ')[0] || ''}! 👋` : `Hello, ${user?.full_name?.split(' ')[0] || ''}! 👋`}
+              </h2>
+              <p className="text-white/40 text-sm mt-0.5">
+                {profile
+                  ? (lang === 'he'
+                    ? `${profile.investor_type === 'experienced' ? 'משקיע מנוסה' : 'משקיע מתחיל'} · סיכון: ${profile.risk_tolerance === 'aggressive' ? 'אגרסיבי' : profile.risk_tolerance === 'moderate' ? 'מתון' : 'שמרני'}`
+                    : `${profile.investor_type} investor · Risk: ${profile.risk_tolerance}`)
+                  : (lang === 'he' ? 'ברוך הבא! השלם את ה-Onboarding כדי להתאים אישית.' : 'Welcome! Complete onboarding to personalize your experience.')}
+              </p>
+            </div>
+            {!profile && (
               <a
-                key={key}
-                href={path}
-                className="group p-5 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/8 hover:border-white/15 transition-all"
+                href="/onboarding"
+                className="flex-shrink-0 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-xl transition-all"
               >
-                <div className="flex items-center justify-between mb-3">
-                  <Icon className="w-5 h-5 text-indigo-400" />
-                  <CollapseIcon className="w-4 h-4 text-white/20 group-hover:text-white/50 transition-colors" />
-                </div>
-                <div className="font-semibold text-white">{t(lang, key)}</div>
-                <div className="text-white/30 text-xs mt-1">{lang === 'he' ? 'לחץ לכניסה' : 'Click to enter'}</div>
+                {lang === 'he' ? 'השלם פרופיל' : 'Complete Profile'}
               </a>
-            ))}
+            )}
           </div>
+
+          {/* Live market ticker */}
+          <MarketTicker />
+
+          {/* Quick stats */}
+          <QuickStats profile={profile} />
+
+          {/* Portfolio chart + Opportunities */}
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
+            <div className="lg:col-span-3">
+              <PortfolioChart />
+            </div>
+            <div className="lg:col-span-2">
+              <TopOpportunities />
+            </div>
+          </div>
+
+          {/* News */}
+          <MarketNews />
         </div>
       </main>
     </div>
