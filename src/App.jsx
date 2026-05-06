@@ -11,6 +11,7 @@ import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import Welcome from '@/pages/Welcome';
 import Onboarding from '@/pages/Onboarding';
 import Dashboard from '@/pages/Dashboard';
+import ValuationEngine from '@/pages/ValuationEngine';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -37,6 +38,7 @@ const AuthenticatedApp = () => {
       <Route path="/" element={<Welcome />} />
       <Route path="/onboarding" element={<Onboarding />} />
       <Route path="/dashboard" element={<Dashboard />} />
+      <Route path="/valuation" element={<ValuationEngine />} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );

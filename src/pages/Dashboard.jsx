@@ -5,7 +5,7 @@ import { base44 } from '@/api/base44Client';
 import LanguageSwitcher from '@/components/layout/LanguageSwitcher';
 import {
   Brain, BarChart3, ScanSearch, Star, TrendingDown, Zap,
-  Settings, Shield, Menu, X, LogOut, User, ChevronRight, ChevronLeft
+  Settings, Shield, Menu, X, LogOut, User, ChevronRight, ChevronLeft, Calculator
 } from 'lucide-react';
 import MarketTicker from '@/components/dashboard/MarketTicker';
 import PortfolioChart from '@/components/dashboard/PortfolioChart';
@@ -21,6 +21,7 @@ const navItems = [
   { key: 'sellList', icon: TrendingDown, path: '/sell-list' },
   { key: 'opportunities', icon: Zap, path: '/opportunities' },
   { key: 'analysis', icon: Brain, path: '/analysis' },
+  { key: 'valuation', icon: Calculator, path: '/valuation' },
 ];
 
 export default function Dashboard() {
