@@ -2,31 +2,44 @@ import { useLang } from '@/lib/LanguageContext';
 import { t } from '@/lib/i18n';
 import { Shield, Scale, Zap } from 'lucide-react';
 
-export default function OnboardingStep4({ value, onChange }) {
+export default function OnboardingStep4({ value, onChange, investorType }) {
   const { lang } = useLang();
+  const isBeginner = investorType === 'beginner';
 
   const options = [
     {
       value: 'conservative',
       icon: Shield,
-      label: t(lang, 'conservative'),
-      desc: t(lang, 'conservativeDesc'),
+      label: isBeginner
+        ? (lang === 'he' ? '😌 שקט בלילה' : '😌 Sleep well at night')
+        : t(lang, 'conservative'),
+      desc: isBeginner
+        ? (lang === 'he' ? 'אם המניה תרד ב-10%, אני אפנה לאחרים ואדאג מאוד' : "If my stock drops 10%, I'll worry a lot and might sell")
+        : t(lang, 'conservativeDesc'),
       color: 'from-sky-500/20 to-blue-500/20 border-sky-500/40',
       iconColor: 'text-sky-400',
     },
     {
       value: 'moderate',
       icon: Scale,
-      label: t(lang, 'moderate'),
-      desc: t(lang, 'moderateDesc'),
+      label: isBeginner
+        ? (lang === 'he' ? '😐 אסבול ירידות קטנות' : '😐 I can handle small drops')
+        : t(lang, 'moderate'),
+      desc: isBeginner
+        ? (lang === 'he' ? 'ירידה של 20-30% תדאיג אותי אבל לא אמכור מיד' : "A 20-30% drop will concern me but I won't panic sell")
+        : t(lang, 'moderateDesc'),
       color: 'from-emerald-500/20 to-green-500/20 border-emerald-500/40',
       iconColor: 'text-emerald-400',
     },
     {
       value: 'aggressive',
       icon: Zap,
-      label: t(lang, 'aggressive'),
-      desc: t(lang, 'aggressiveDesc'),
+      label: isBeginner
+        ? (lang === 'he' ? '😤 אני בשביל הרווח הגדול' : '😤 I am here for big gains')
+        : t(lang, 'aggressive'),
+      desc: isBeginner
+        ? (lang === 'he' ? 'מוכן לסכן יותר — אפילו ירידה של 50% לא תגרום לי למכור' : "Ready to risk more — even a 50% drop won't make me sell")
+        : t(lang, 'aggressiveDesc'),
       color: 'from-rose-500/20 to-red-500/20 border-rose-500/40',
       iconColor: 'text-rose-400',
     },

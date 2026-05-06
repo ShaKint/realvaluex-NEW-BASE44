@@ -110,9 +110,9 @@ export default function Onboarding() {
           </div>
 
           {step === 1 && <OnboardingStep1 value={form.investor_type} onChange={v => setForm(f => ({ ...f, investor_type: v }))} />}
-          {step === 2 && <OnboardingStep2 value={form.step2} onChange={v => setForm(f => ({ ...f, step2: v }))} />}
-          {step === 3 && <OnboardingStep3 value={form.has_existing_portfolio} onChange={v => setForm(f => ({ ...f, has_existing_portfolio: v }))} />}
-          {step === 4 && <OnboardingStep4 value={form.risk_tolerance} onChange={v => setForm(f => ({ ...f, risk_tolerance: v }))} />}
+          {step === 2 && <OnboardingStep2 value={form.step2} onChange={v => setForm(f => ({ ...f, step2: v }))} investorType={form.investor_type} />}
+          {step === 3 && <OnboardingStep3 value={form.has_existing_portfolio} onChange={v => setForm(f => ({ ...f, has_existing_portfolio: v }))} investorType={form.investor_type} />}
+          {step === 4 && <OnboardingStep4 value={form.risk_tolerance} onChange={v => setForm(f => ({ ...f, risk_tolerance: v }))} investorType={form.investor_type} />}
           {step === 5 && <OnboardingStep5 value={form.investment_goals} onChange={v => setForm(f => ({ ...f, investment_goals: v }))} />}
         </div>
       </div>
