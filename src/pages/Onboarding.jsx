@@ -37,11 +37,10 @@ export default function Onboarding() {
   };
 
   const handleFinish = async () => {
-    const currentUser = user || (await base44.auth.me());
-    if (!currentUser) return;
+    if (!user) return;
     setSaving(true);
     await base44.entities.UserProfile.create({
-      user_id: currentUser.email,
+      user_id: user.email,
       investor_type: form.investor_type,
       experience_years: form.step2?.years ?? 0,
       investing_styles: form.step2?.styles ?? [],
@@ -76,6 +75,11 @@ export default function Onboarding() {
         <div className="w-8 h-8 border-4 border-indigo-800 border-t-indigo-400 rounded-full animate-spin" />
       </div>
     );
+  }
+
+  if (!user) {
+    base44.auth.redirectToLogin(window.location.href);
+    return null;
   }
 
   return (
