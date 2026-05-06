@@ -37,10 +37,11 @@ export default function Onboarding() {
   };
 
   const handleFinish = async () => {
-    if (!user) return;
+    const currentUser = user || (await base44.auth.me());
+    if (!currentUser) return;
     setSaving(true);
     await base44.entities.UserProfile.create({
-      user_id: user.email,
+      user_id: currentUser.email,
       investor_type: form.investor_type,
       experience_years: form.step2?.years ?? 0,
       investing_styles: form.step2?.styles ?? [],
