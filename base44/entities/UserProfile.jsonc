@@ -1,0 +1,57 @@
+{
+  "name": "UserProfile",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string",
+      "description": "Reference to User entity"
+    },
+    "investor_type": {
+      "type": "string",
+      "enum": [
+        "beginner",
+        "experienced"
+      ],
+      "description": "Type of investor"
+    },
+    "experience_years": {
+      "type": "number",
+      "description": "Years of investment experience"
+    },
+    "has_existing_portfolio": {
+      "type": "boolean",
+      "description": "Does the user have an existing portfolio?"
+    },
+    "preferred_language": {
+      "type": "string",
+      "enum": [
+        "he",
+        "en"
+      ],
+      "default": "he"
+    },
+    "risk_tolerance": {
+      "type": "string",
+      "enum": [
+        "conservative",
+        "moderate",
+        "aggressive"
+      ]
+    },
+    "investment_goals": {
+      "type": "string",
+      "description": "User's investment goals"
+    },
+    "onboarding_completed": {
+      "type": "boolean",
+      "default": false
+    },
+    "onboarding_step": {
+      "type": "number",
+      "default": 0
+    }
+  },
+  "required": [
+    "user_id"
+  ]
+}

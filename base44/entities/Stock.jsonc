@@ -1,0 +1,39 @@
+{
+  "name": "Stock",
+  "type": "object",
+  "properties": {
+    "ticker": {
+      "type": "string",
+      "description": "Stock ticker symbol (e.g. AAPL)"
+    },
+    "company_name": {
+      "type": "string"
+    },
+    "sector": {
+      "type": "string"
+    },
+    "market_cap": {
+      "type": "number"
+    },
+    "current_price": {
+      "type": "number"
+    },
+    "currency": {
+      "type": "string",
+      "default": "USD"
+    },
+    "exchange": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "last_updated": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "ticker"
+  ]
+}
