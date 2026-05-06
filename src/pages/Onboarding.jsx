@@ -20,7 +20,7 @@ export default function Onboarding() {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     investor_type: null,
-    experience_years: 0,
+    step2: { years: 0, styles: [], horizons: [], markets: [], sectors: [] },
     has_existing_portfolio: null,
     risk_tolerance: null,
     investment_goals: '',
@@ -40,7 +40,11 @@ export default function Onboarding() {
     await base44.entities.UserProfile.create({
       user_id: user.id,
       investor_type: form.investor_type,
-      experience_years: form.experience_years,
+      experience_years: form.step2?.years ?? 0,
+      investing_styles: form.step2?.styles ?? [],
+      investment_horizons: form.step2?.horizons ?? [],
+      active_markets: form.step2?.markets ?? [],
+      preferred_sectors: form.step2?.sectors ?? [],
       has_existing_portfolio: form.has_existing_portfolio,
       risk_tolerance: form.risk_tolerance,
       investment_goals: form.investment_goals,
@@ -96,7 +100,7 @@ export default function Onboarding() {
           </div>
 
           {step === 1 && <OnboardingStep1 value={form.investor_type} onChange={v => setForm(f => ({ ...f, investor_type: v }))} />}
-          {step === 2 && <OnboardingStep2 value={form.experience_years} onChange={v => setForm(f => ({ ...f, experience_years: v }))} />}
+          {step === 2 && <OnboardingStep2 value={form.step2} onChange={v => setForm(f => ({ ...f, step2: v }))} />}
           {step === 3 && <OnboardingStep3 value={form.has_existing_portfolio} onChange={v => setForm(f => ({ ...f, has_existing_portfolio: v }))} />}
           {step === 4 && <OnboardingStep4 value={form.risk_tolerance} onChange={v => setForm(f => ({ ...f, risk_tolerance: v }))} />}
           {step === 5 && <OnboardingStep5 value={form.investment_goals} onChange={v => setForm(f => ({ ...f, investment_goals: v }))} />}

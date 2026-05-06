@@ -11,16 +11,40 @@
       "enum": [
         "beginner",
         "experienced"
-      ],
-      "description": "Type of investor"
+      ]
     },
     "experience_years": {
-      "type": "number",
-      "description": "Years of investment experience"
+      "type": "number"
+    },
+    "investing_styles": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "fundamental, technical, macro, quantitative, mixed"
+    },
+    "investment_horizons": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "swing, medium, long"
+    },
+    "active_markets": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "us, israel, europe, emerging, crypto"
+    },
+    "preferred_sectors": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
     },
     "has_existing_portfolio": {
-      "type": "boolean",
-      "description": "Does the user have an existing portfolio?"
+      "type": "boolean"
     },
     "preferred_language": {
       "type": "string",
@@ -39,8 +63,7 @@
       ]
     },
     "investment_goals": {
-      "type": "string",
-      "description": "User's investment goals"
+      "type": "string"
     },
     "onboarding_completed": {
       "type": "boolean",
