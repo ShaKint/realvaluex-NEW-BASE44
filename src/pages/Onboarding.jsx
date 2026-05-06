@@ -28,7 +28,7 @@ export default function Onboarding() {
 
   const canProceed = () => {
     if (step === 1) return !!form.investor_type;
-    if (step === 2) return form.experience_years >= 0;
+    if (step === 2) return true;
     if (step === 3) return form.has_existing_portfolio !== null;
     if (step === 4) return !!form.risk_tolerance;
     return true;
