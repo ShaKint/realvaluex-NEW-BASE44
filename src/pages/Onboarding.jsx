@@ -16,7 +16,7 @@ const TOTAL_STEPS = 5;
 
 export default function Onboarding() {
   const { lang, isRTL } = useLang();
-  const { user } = useAuth();
+  const { user, isLoadingAuth } = useAuth();
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
@@ -37,9 +37,10 @@ export default function Onboarding() {
   };
 
   const handleFinish = async () => {
+    if (!user) return;
     setSaving(true);
     await base44.entities.UserProfile.create({
-      user_id: user.id,
+      user_id: user.email,
       investor_type: form.investor_type,
       experience_years: form.step2?.years ?? 0,
       investing_styles: form.step2?.styles ?? [],
@@ -67,6 +68,14 @@ export default function Onboarding() {
 
   const BackIcon = isRTL ? ArrowRight : ArrowLeft;
   const NextIcon = isRTL ? ArrowLeft : ArrowRight;
+
+  if (isLoadingAuth) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-slate-950">
+        <div className="w-8 h-8 border-4 border-indigo-800 border-t-indigo-400 rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 flex flex-col">
