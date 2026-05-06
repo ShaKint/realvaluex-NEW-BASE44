@@ -1,0 +1,54 @@
+{
+  "name": "Alert",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string"
+    },
+    "ticker": {
+      "type": "string",
+      "description": "Stock ticker symbol"
+    },
+    "company_name": {
+      "type": "string"
+    },
+    "alert_type": {
+      "type": "string",
+      "enum": [
+        "price_above",
+        "price_below",
+        "percent_change",
+        "earnings",
+        "news"
+      ],
+      "description": "Type of alert trigger"
+    },
+    "target_value": {
+      "type": "number",
+      "description": "Price or % threshold"
+    },
+    "current_price": {
+      "type": "number"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    },
+    "triggered": {
+      "type": "boolean",
+      "default": false
+    },
+    "triggered_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "user_id",
+    "ticker",
+    "alert_type"
+  ]
+}

@@ -70,6 +70,8 @@ export const translations = {
     opportunities: "הזדמנויות",
     analysis: "ניתוח AI",
     valuation: "מנוע הערכה",
+    alerts: "התראות",
+    news: "חדשות שוק",
     settings: "הגדרות",
     adminPanel: "פאנל ניהול",
   },
@@ -144,6 +146,8 @@ export const translations = {
     opportunities: "Opportunities",
     analysis: "AI Analysis",
     valuation: "Valuation Engine",
+    alerts: "Alerts",
+    news: "News Feed",
     settings: "Settings",
     adminPanel: "Admin Panel",
   }

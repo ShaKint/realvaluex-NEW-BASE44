@@ -12,6 +12,9 @@ import Welcome from '@/pages/Welcome';
 import Onboarding from '@/pages/Onboarding';
 import Dashboard from '@/pages/Dashboard';
 import ValuationEngine from '@/pages/ValuationEngine';
+import Scanner from '@/pages/Scanner';
+import Alerts from '@/pages/Alerts';
+import NewsFeed from '@/pages/NewsFeed';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -39,6 +42,9 @@ const AuthenticatedApp = () => {
       <Route path="/onboarding" element={<Onboarding />} />
       <Route path="/dashboard" element={<Dashboard />} />
       <Route path="/valuation" element={<ValuationEngine />} />
+      <Route path="/scanner" element={<Scanner />} />
+      <Route path="/alerts" element={<Alerts />} />
+      <Route path="/news" element={<NewsFeed />} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );
