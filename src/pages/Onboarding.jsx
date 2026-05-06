@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLang } from '@/lib/LanguageContext';
 import { t } from '@/lib/i18n';
 import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
 import LanguageSwitcher from '@/components/layout/LanguageSwitcher';
 import OnboardingStep1 from '@/components/onboarding/OnboardingStep1';
 import OnboardingStep2 from '@/components/onboarding/OnboardingStep2';
@@ -15,6 +16,7 @@ const TOTAL_STEPS = 5;
 
 export default function Onboarding() {
   const { lang, isRTL } = useLang();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
@@ -36,7 +38,6 @@ export default function Onboarding() {
 
   const handleFinish = async () => {
     setSaving(true);
-    const user = await base44.auth.me();
     await base44.entities.UserProfile.create({
       user_id: user.id,
       investor_type: form.investor_type,
