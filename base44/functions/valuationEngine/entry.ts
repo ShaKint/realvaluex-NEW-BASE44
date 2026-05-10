@@ -6,11 +6,18 @@ Deno.serve(async (req) => {
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { ticker, company_name, financials } = await req.json();
+    const { ticker, company_name, financials, lang } = await req.json();
 
     if (!ticker) return Response.json({ error: 'ticker required' }, { status: 400 });
 
+    const isHebrew = lang === 'he';
+    const langInstruction = isHebrew
+      ? 'IMPORTANT: Write ALL text fields in Hebrew (עברית). All explanations, summaries, rationales, risks, catalysts, recommendations, and descriptions must be in Hebrew. Use Hebrew financial terminology. Numbers and tickers remain in English.'
+      : 'Write all text fields in English.';
+
     const prompt = `You are RealValueX™ v3.0 — an elite equity analyst using a rigorous 4-layer, 36-chapter stock analysis model. Analyze: ${ticker} (${company_name || ticker}).
+
+${langInstruction}
 
 User-provided financials (supplement with your knowledge if empty): ${JSON.stringify(financials || {})}
 

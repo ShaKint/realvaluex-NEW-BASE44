@@ -18,7 +18,7 @@ export default function ValuationEngine() {
     setResult(null);
     setError('');
     setTicker(t);
-    const res = await base44.functions.invoke('valuationEngine', { ticker: t, financials });
+    const res = await base44.functions.invoke('valuationEngine', { ticker: t, financials, lang });
     if (res.data?.error) setError(res.data.error);
     else setResult(res.data?.valuation);
     setLoading(false);

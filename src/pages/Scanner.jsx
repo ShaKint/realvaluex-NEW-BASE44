@@ -47,7 +47,9 @@ export default function Scanner() {
     setLoading(true);
     setScanned(false);
     const res = await base44.integrations.Core.InvokeLLM({
-      prompt: `You are a stock screener AI for the RealValueX™ platform. Generate a realistic list of 12 stocks matching these filters:
+      prompt: `You are a stock screener AI for the RealValueX™ platform.${lang === 'he' ? ' IMPORTANT: Write ALL text fields (one_liner_he, rationale_he, strategy_fit, earnings_track, tam_growth, analyst_consensus, key_catalysts, key_risks) in Hebrew (עברית). Numbers and tickers remain in English.' : ''}
+
+Generate a realistic list of 12 stocks matching these filters:
 - Sector: ${filters.sector === 'all' ? 'any sector' : filters.sector}
 - Strategy: ${filters.strategy || 'any'}
 - Market Cap: ${filters.marketCap}
