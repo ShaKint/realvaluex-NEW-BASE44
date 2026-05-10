@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useLang } from '@/lib/LanguageContext';
-import { ScanSearch, Filter, TrendingUp, TrendingDown, Minus, ExternalLink, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
+import { ScanSearch, Filter, TrendingUp, TrendingDown, Minus, RefreshCw, ChevronDown, ChevronUp, BookOpen } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 
@@ -41,6 +41,7 @@ export default function Scanner() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [sortBy, setSortBy] = useState('upside');
   const [sortDir, setSortDir] = useState('desc');
+  const [expandedIdx, setExpandedIdx] = useState(null);
 
   const handleScan = async () => {
     setLoading(true);
@@ -54,8 +55,15 @@ export default function Scanner() {
 - Min P/E: ${filters.minPE || 'no limit'}
 - Min Upside: ${filters.minUpside || '0'}%
 
-Return realistic stock data with tickers from US markets (NYSE/NASDAQ). Each stock should genuinely fit the filters.
-Use real companies. Vary the results - don't always pick the same stocks.`,
+Return realistic stock data with tickers from US markets (NYSE/NASDAQ). Each stock should genuinely fit the filters. Use real companies. Vary the results.
+
+For each stock, provide a detailed rationale explaining WHY it matches the strategy, including:
+- Market/industry TAM growth projections and trends
+- Historical earnings beats/misses track record (e.g. "beat estimates 8/8 quarters")
+- Analyst consensus and price targets
+- Key financial metrics driving the thesis (revenue growth rate, margins, FCF)
+- Specific catalysts that could unlock value
+- Any notable risks to the thesis`,
       response_json_schema: {
         type: 'object',
         properties: {
@@ -78,6 +86,14 @@ Use real companies. Vary the results - don't always pick the same stocks.`,
                 one_liner: { type: 'string' },
                 one_liner_he: { type: 'string' },
                 trend: { type: 'string', enum: ['up', 'down', 'flat'] },
+                rationale: { type: 'string' },
+                rationale_he: { type: 'string' },
+                earnings_track: { type: 'string' },
+                analyst_target: { type: 'number' },
+                analyst_consensus: { type: 'string' },
+                tam_growth: { type: 'string' },
+                key_catalysts: { type: 'array', items: { type: 'string' } },
+                key_risks: { type: 'array', items: { type: 'string' } },
               }
             }
           }
@@ -233,45 +249,127 @@ Use real companies. Vary the results - don't always pick the same stocks.`,
             </div>
 
             <div className="space-y-3">
-              {sorted.map((stock, i) => (
-                <div key={i} className="p-4 rounded-2xl bg-white/5 border border-white/5 hover:border-white/10 transition-all">
-                  <div className="flex items-start justify-between gap-3 flex-wrap">
-                    <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center font-bold text-white text-xs flex-shrink-0">
-                        {stock.ticker?.slice(0, 4)}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-white">{stock.ticker}</span>
-                          <TrendIcon trend={stock.trend} />
-                          <span className="text-white/30 text-xs">{stock.sector}</span>
+              {sorted.map((stock, i) => {
+                const isExpanded = expandedIdx === i;
+                return (
+                <div key={i} className="rounded-2xl bg-white/5 border border-white/5 hover:border-white/10 transition-all overflow-hidden">
+                  <div className="p-4">
+                    <div className="flex items-start justify-between gap-3 flex-wrap">
+                      <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center font-bold text-white text-xs flex-shrink-0">
+                          {stock.ticker?.slice(0, 4)}
                         </div>
-                        <div className="text-white/50 text-sm">{stock.company}</div>
-                        <div className="text-white/30 text-xs mt-0.5">{lang === 'he' ? stock.one_liner_he : stock.one_liner}</div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-white">{stock.ticker}</span>
+                            <TrendIcon trend={stock.trend} />
+                            <span className="text-white/30 text-xs">{stock.sector}</span>
+                          </div>
+                          <div className="text-white/50 text-sm">{stock.company}</div>
+                          <div className="text-white/30 text-xs mt-0.5">{lang === 'he' ? stock.one_liner_he : stock.one_liner}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4 flex-wrap">
+                        <div className="text-right">
+                          <div className="text-white font-semibold">${stock.price?.toFixed(2)}</div>
+                          <div className="text-white/30 text-xs">P/E {stock.pe_ratio?.toFixed(1)}</div>
+                        </div>
+                        <div className={`px-3 py-1.5 rounded-xl text-sm font-bold ${(stock.upside_potential || 0) > 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                          {(stock.upside_potential || 0) > 0 ? '+' : ''}{stock.upside_potential?.toFixed(0)}%
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {[...Array(5)].map((_, j) => (
+                            <div key={j} className={`w-1.5 h-4 rounded-full ${j < Math.round((stock.score || 0) / 20) ? 'bg-indigo-500' : 'bg-white/10'}`} />
+                          ))}
+                        </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-4 flex-wrap">
-                      <div className="text-right">
-                        <div className="text-white font-semibold">${stock.price?.toFixed(2)}</div>
-                        <div className="text-white/30 text-xs">P/E {stock.pe_ratio?.toFixed(1)}</div>
+                    {stock.strategy_fit && (
+                      <div className="mt-2 text-xs text-indigo-300/60 flex items-center gap-1">
+                        <span>✦</span> {stock.strategy_fit}
                       </div>
-                      <div className={`px-3 py-1.5 rounded-xl text-sm font-bold ${(stock.upside_potential || 0) > 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
-                        {(stock.upside_potential || 0) > 0 ? '+' : ''}{stock.upside_potential?.toFixed(0)}%
-                      </div>
-                      <div className="flex items-center gap-1">
-                        {[...Array(5)].map((_, j) => (
-                          <div key={j} className={`w-1.5 h-4 rounded-full ${j < Math.round((stock.score || 0) / 20) ? 'bg-indigo-500' : 'bg-white/10'}`} />
-                        ))}
-                      </div>
-                    </div>
+                    )}
+                    {/* Rationale toggle */}
+                    <button
+                      onClick={() => setExpandedIdx(isExpanded ? null : i)}
+                      className="mt-3 flex items-center gap-1.5 text-xs text-cyan-400/70 hover:text-cyan-400 transition-colors"
+                    >
+                      <BookOpen className="w-3.5 h-3.5" />
+                      {lang === 'he' ? (isExpanded ? 'הסתר רציונל' : 'הצג רציונל מלא') : (isExpanded ? 'Hide Rationale' : 'Show Full Rationale')}
+                      {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                    </button>
                   </div>
-                  {stock.strategy_fit && (
-                    <div className="mt-2 text-xs text-indigo-300/60 flex items-center gap-1">
-                      <span>✦</span> {stock.strategy_fit}
+
+                  {/* Expanded rationale */}
+                  {isExpanded && (
+                    <div className="border-t border-white/5 p-4 space-y-4 bg-slate-900/40">
+                      {/* Main rationale */}
+                      {(lang === 'he' ? stock.rationale_he : stock.rationale) && (
+                        <div>
+                          <div className="text-white/40 text-xs uppercase tracking-widest mb-2">{lang === 'he' ? 'ניתוח מלא' : 'Full Analysis'}</div>
+                          <p className="text-white/75 text-sm leading-relaxed">{lang === 'he' ? stock.rationale_he : stock.rationale}</p>
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        {/* Analyst consensus */}
+                        {stock.analyst_consensus && (
+                          <div className="p-3 rounded-xl bg-white/5">
+                            <div className="text-white/35 text-xs mb-1">{lang === 'he' ? 'קונצנזוס אנליסטים' : 'Analyst Consensus'}</div>
+                            <div className="text-white font-semibold text-sm">{stock.analyst_consensus}</div>
+                            {stock.analyst_target && (
+                              <div className="text-emerald-400 text-xs mt-0.5">{lang === 'he' ? 'יעד:' : 'Target:'} ${stock.analyst_target}</div>
+                            )}
+                          </div>
+                        )}
+                        {/* Earnings track */}
+                        {stock.earnings_track && (
+                          <div className="p-3 rounded-xl bg-white/5">
+                            <div className="text-white/35 text-xs mb-1">{lang === 'he' ? 'רצף הכנסות' : 'Earnings Track'}</div>
+                            <div className="text-white text-sm">{stock.earnings_track}</div>
+                          </div>
+                        )}
+                        {/* TAM growth */}
+                        {stock.tam_growth && (
+                          <div className="p-3 rounded-xl bg-white/5">
+                            <div className="text-white/35 text-xs mb-1">{lang === 'he' ? 'צמיחת שוק (TAM)' : 'Market Growth (TAM)'}</div>
+                            <div className="text-white text-sm">{stock.tam_growth}</div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Catalysts & Risks */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {stock.key_catalysts?.length > 0 && (
+                          <div>
+                            <div className="text-emerald-400/60 text-xs uppercase tracking-widest mb-2">{lang === 'he' ? 'קטליזטורים' : 'Catalysts'}</div>
+                            <ul className="space-y-1">
+                              {stock.key_catalysts.map((c, ci) => (
+                                <li key={ci} className="flex items-start gap-2 text-white/60 text-xs">
+                                  <span className="text-emerald-400 mt-0.5">▲</span> {c}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {stock.key_risks?.length > 0 && (
+                          <div>
+                            <div className="text-rose-400/60 text-xs uppercase tracking-widest mb-2">{lang === 'he' ? 'סיכונים' : 'Risks'}</div>
+                            <ul className="space-y-1">
+                              {stock.key_risks.map((r, ri) => (
+                                <li key={ri} className="flex items-start gap-2 text-white/60 text-xs">
+                                  <span className="text-rose-400 mt-0.5">▼</span> {r}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
