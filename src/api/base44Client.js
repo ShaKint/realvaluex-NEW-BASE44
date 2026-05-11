@@ -10,5 +10,6 @@ export const base44 = createClient({
   functionsVersion,
   serverUrl: '',
   requiresAuth: false,
-  appBaseUrl
+  appBaseUrl,
+  functionTimeout: 180000
 });

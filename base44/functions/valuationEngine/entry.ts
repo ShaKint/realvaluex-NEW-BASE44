@@ -36,7 +36,7 @@ Return comprehensive JSON with all fields populated with substantive analysis.`;
 
     const result = await base44.integrations.Core.InvokeLLM({
       prompt,
-      model: 'gpt_5_4',
+      model: 'claude_sonnet_4_6',
       response_json_schema: {
         type: 'object',
         properties: {
