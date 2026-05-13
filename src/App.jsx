@@ -1,13 +1,18 @@
-import { Toaster } from "@/components/ui/toaster"
-import { QueryClientProvider } from '@tanstack/react-query'
-import { queryClientInstance } from '@/lib/query-client'
+**להחליף: `src/App.jsx`**
+
+נתיב: https://github.com/ShaKint/realvaluex-NEW-BASE44/blob/main/src/App.jsx
+
+תוכן:
+
+```jsx
+import { Toaster } from "@/components/ui/toaster";
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClientInstance } from '@/lib/query-client';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import { LanguageProvider } from '@/lib/LanguageContext';
-import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 
-// Pages
 import Welcome from '@/pages/Welcome';
 import Onboarding from '@/pages/Onboarding';
 import Dashboard from '@/pages/Dashboard';
@@ -17,25 +22,14 @@ import Alerts from '@/pages/Alerts';
 import NewsFeed from '@/pages/NewsFeed';
 
 const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
-
-  if (isLoadingPublicSettings || isLoadingAuth) {
+  const { isLoadingAuth } = useAuth();
+  if (isLoadingAuth) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-slate-950">
         <div className="w-8 h-8 border-4 border-indigo-800 border-t-indigo-400 rounded-full animate-spin"></div>
       </div>
     );
   }
-
-  if (authError) {
-    if (authError.type === 'user_not_registered') {
-      return <UserNotRegisteredError />;
-    } else if (authError.type === 'auth_required') {
-      navigateToLogin();
-      return null;
-    }
-  }
-
   return (
     <Routes>
       <Route path="/" element={<Welcome />} />
@@ -66,3 +60,4 @@ function App() {
 }
 
 export default App;
+```
