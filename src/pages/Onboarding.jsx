@@ -1,9 +1,22 @@
-import { useState, useEffect } from 'react';
+**להחליף: `src/pages/Onboarding.jsx`**
+
+נתיב: https://github.com/ShaKint/realvaluex-NEW-BASE44/blob/main/src/pages/Onboarding.jsx
+
+תוכן:
+
+```jsx
+// src/pages/Onboarding.jsx
+// CHANGES vs Base44:
+//   - base44.entities.UserProfile.create() → supabase.from('user_profiles').upsert()
+//   - base44.auth.redirectToLogin() → navigateToLogin from AuthContext
+//   - user_id now uses user.id (UUID) instead of user.email
+
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLang } from '@/lib/LanguageContext';
 import { t } from '@/lib/i18n';
-import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
+import { supabase } from '@/lib/supabase';
 import LanguageSwitcher from '@/components/layout/LanguageSwitcher';
 import OnboardingStep1 from '@/components/onboarding/OnboardingStep1';
 import OnboardingStep2 from '@/components/onboarding/OnboardingStep2';
@@ -16,7 +29,7 @@ const TOTAL_STEPS = 5;
 
 export default function Onboarding() {
   const { lang, isRTL } = useLang();
-  const { user, isLoadingAuth } = useAuth();
+  const { user, isLoadingAuth, navigateToLogin } = useAuth();
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
@@ -39,23 +52,27 @@ export default function Onboarding() {
   const handleFinish = async () => {
     if (!user) return;
     setSaving(true);
-    await base44.entities.UserProfile.create({
-      user_id: user.email,
-      investor_type: form.investor_type,
-      experience_years: form.step2?.years ?? 0,
-      investing_styles: form.step2?.styles ?? [],
-      investment_horizons: form.step2?.horizons ?? [],
-      active_markets: form.step2?.markets ?? [],
-      preferred_sectors: form.step2?.sectors ?? [],
-      has_existing_portfolio: form.has_existing_portfolio,
-      risk_tolerance: form.risk_tolerance,
-      investment_goals: form.investment_goals,
-      preferred_language: lang,
-      onboarding_completed: true,
-      onboarding_step: TOTAL_STEPS,
-    });
+    // Upsert by user_id (which is UNIQUE) so re-running onboarding overwrites
+    const { error } = await supabase
+      .from('user_profiles')
+      .upsert({
+        user_id: user.id,
+        investor_type: form.investor_type,
+        experience_years: form.step2?.years ?? 0,
+        investing_styles: form.step2?.styles ?? [],
+        investment_horizons: form.step2?.horizons ?? [],
+        active_markets: form.step2?.markets ?? [],
+        preferred_sectors: form.step2?.sectors ?? [],
+        has_existing_portfolio: form.has_existing_portfolio,
+        risk_tolerance: form.risk_tolerance,
+        investment_goals: form.investment_goals,
+        preferred_language: lang,
+        onboarding_completed: true,
+        onboarding_step: TOTAL_STEPS,
+      }, { onConflict: 'user_id' });
     setSaving(false);
-    navigate('/dashboard');
+    if (!error) navigate('/dashboard');
+    else console.error('[onboarding] save failed:', error);
   };
 
   const stepTitles = {
@@ -85,7 +102,7 @@ export default function Onboarding() {
             {lang === 'he' ? 'יש להתחבר כדי להמשיך' : 'Please log in to continue'}
           </div>
           <button
-            onClick={() => base44.auth.redirectToLogin(window.location.href)}
+            onClick={navigateToLogin}
             className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-semibold transition-all"
           >
             {lang === 'he' ? 'התחברות' : 'Log In'}
@@ -172,3 +189,4 @@ export default function Onboarding() {
     </div>
   );
 }
+```
