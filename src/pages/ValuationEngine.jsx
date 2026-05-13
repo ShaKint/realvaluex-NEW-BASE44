@@ -1,6 +1,13 @@
+**להחליף: `src/pages/ValuationEngine.jsx`**
+
+נתיב: https://github.com/ShaKint/realvaluex-NEW-BASE44/blob/main/src/pages/ValuationEngine.jsx
+
+תוכן:
+
+```jsx
 import { useState } from 'react';
 import { useLang } from '@/lib/LanguageContext';
-import { base44 } from '@/api/base44Client';
+import { runValuation } from '@/lib/api-client';
 import { Brain } from 'lucide-react';
 import ValuationForm from '@/components/valuation/ValuationForm';
 import ValuationResult from '@/components/valuation/ValuationResult';
@@ -18,9 +25,13 @@ export default function ValuationEngine() {
     setResult(null);
     setError('');
     setTicker(t);
-    const res = await base44.functions.invoke('valuationEngine', { ticker: t, financials, lang });
-    if (res.data?.error) setError(res.data.error);
-    else setResult(res.data?.valuation);
+    try {
+      const data = await runValuation({ ticker: t, financials, lang });
+      if (data?.error) setError(data.error);
+      else setResult(data?.valuation);
+    } catch (e) {
+      setError(e.message);
+    }
     setLoading(false);
   };
 
@@ -63,3 +74,4 @@ export default function ValuationEngine() {
     </DashboardLayout>
   );
 }
+```
