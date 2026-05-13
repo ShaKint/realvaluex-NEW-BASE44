@@ -1,5 +1,4 @@
 // server/routes/market-news.js
-// Replaces: base44.integrations.Core.InvokeLLM in src/components/dashboard/MarketNews.jsx
 
 import { Router } from 'express';
 import { anthropic } from '../index.js';
