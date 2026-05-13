@@ -1,7 +1,14 @@
-import { useState, useEffect } from 'react';
+הבנתי. אני צריך לראות את הקובץ המקורי כדי להחליף נכון. רגע אחד:**להחליף: `src/components/layout/DashboardLayout.jsx`**
+
+נתיב: https://github.com/ShaKint/realvaluex-NEW-BASE44/blob/main/src/components/layout/DashboardLayout.jsx
+
+תוכן:
+
+```jsx
+import { useState } from 'react';
 import { useLang } from '@/lib/LanguageContext';
 import { t } from '@/lib/i18n';
-import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
 import LanguageSwitcher from '@/components/layout/LanguageSwitcher';
 import {
   Brain, BarChart3, ScanSearch, Star, TrendingDown, Zap,
@@ -23,15 +30,12 @@ const navItems = [
 
 export default function DashboardLayout({ children }) {
   const { lang, isRTL } = useLang();
-  const [user, setUser] = useState(null);
+  const { user, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const currentPath = window.location.pathname;
 
-  useEffect(() => {
-    base44.auth.me().then(u => setUser(u));
-  }, []);
-
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.user_metadata?.role === 'admin' || user?.app_metadata?.role === 'admin';
+  const displayName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || '';
 
   return (
     <div className={`min-h-screen bg-slate-950 text-white flex ${isRTL ? 'flex-row-reverse' : 'flex-row'}`}>
@@ -54,7 +58,7 @@ export default function DashboardLayout({ children }) {
             const active = currentPath === path;
             const label = t(lang, key);
             return (
-              <a
+              
                 key={key}
                 href={path}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
@@ -72,7 +76,7 @@ export default function DashboardLayout({ children }) {
               <div className="pt-3 pb-1 px-3">
                 <div className="text-white/20 text-xs uppercase tracking-widest">Admin</div>
               </div>
-              <a
+              
                 href="/admin"
                 className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-amber-400/70 hover:text-amber-400 hover:bg-amber-400/5 transition-all"
               >
@@ -90,7 +94,7 @@ export default function DashboardLayout({ children }) {
             <span>{t(lang, 'settings')}</span>
           </a>
           <button
-            onClick={() => base44.auth.logout('/')}
+            onClick={() => logout()}
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-white/30 hover:text-white/70 hover:bg-white/5 transition-all"
           >
             <LogOut className="w-4 h-4" />
@@ -120,9 +124,9 @@ export default function DashboardLayout({ children }) {
           {user && (
             <div className="flex items-center gap-2 text-sm text-white/50">
               <div className="w-7 h-7 rounded-full bg-indigo-600 flex items-center justify-center text-xs font-bold text-white">
-                {user.full_name?.[0]?.toUpperCase() || <User className="w-3.5 h-3.5" />}
+                {displayName?.[0]?.toUpperCase() || <User className="w-3.5 h-3.5" />}
               </div>
-              <span className="hidden sm:block">{user.full_name}</span>
+              <span className="hidden sm:block">{displayName}</span>
             </div>
           )}
         </header>
@@ -132,3 +136,4 @@ export default function DashboardLayout({ children }) {
     </div>
   );
 }
+```
