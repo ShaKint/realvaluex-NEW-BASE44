@@ -1,7 +1,14 @@
+**להחליף: `src/pages/Scanner.jsx`**
+
+נתיב: https://github.com/ShaKint/realvaluex-NEW-BASE44/blob/main/src/pages/Scanner.jsx
+
+תוכן:
+
+```jsx
 import { useState } from 'react';
 import { useLang } from '@/lib/LanguageContext';
 import { ScanSearch, Filter, TrendingUp, TrendingDown, Minus, RefreshCw, ChevronDown, ChevronUp, BookOpen } from 'lucide-react';
-import { base44 } from '@/api/base44Client';
+import { runScanner } from '@/lib/api-client';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 
 const SECTORS = {
@@ -33,7 +40,7 @@ const MARKET_CAPS = {
 };
 
 export default function Scanner() {
-  const { lang, isRTL } = useLang();
+  const { lang } = useLang();
   const [filters, setFilters] = useState({ sector: 'all', strategy: '', marketCap: 'all', minPE: '', maxPE: '', minUpside: '' });
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -46,64 +53,13 @@ export default function Scanner() {
   const handleScan = async () => {
     setLoading(true);
     setScanned(false);
-    const res = await base44.integrations.Core.InvokeLLM({
-      prompt: `You are a stock screener AI for the RealValueX™ platform.${lang === 'he' ? ' IMPORTANT: Write ALL text fields (one_liner_he, rationale_he, strategy_fit, earnings_track, tam_growth, analyst_consensus, key_catalysts, key_risks) in Hebrew (עברית). Numbers and tickers remain in English.' : ''}
-
-Generate a realistic list of 12 stocks matching these filters:
-- Sector: ${filters.sector === 'all' ? 'any sector' : filters.sector}
-- Strategy: ${filters.strategy || 'any'}
-- Market Cap: ${filters.marketCap}
-- Max P/E: ${filters.maxPE || 'no limit'}
-- Min P/E: ${filters.minPE || 'no limit'}
-- Min Upside: ${filters.minUpside || '0'}%
-
-Return realistic stock data with tickers from US markets (NYSE/NASDAQ). Each stock should genuinely fit the filters. Use real companies. Vary the results.
-
-For each stock, provide a detailed rationale explaining WHY it matches the strategy, including:
-- Market/industry TAM growth projections and trends
-- Historical earnings beats/misses track record (e.g. "beat estimates 8/8 quarters")
-- Analyst consensus and price targets
-- Key financial metrics driving the thesis (revenue growth rate, margins, FCF)
-- Specific catalysts that could unlock value
-- Any notable risks to the thesis`,
-      response_json_schema: {
-        type: 'object',
-        properties: {
-          stocks: {
-            type: 'array',
-            items: {
-              type: 'object',
-              properties: {
-                ticker: { type: 'string' },
-                company: { type: 'string' },
-                sector: { type: 'string' },
-                price: { type: 'number' },
-                pe_ratio: { type: 'number' },
-                upside_potential: { type: 'number' },
-                market_cap_b: { type: 'number' },
-                revenue_growth: { type: 'number' },
-                dividend_yield: { type: 'number' },
-                score: { type: 'number' },
-                strategy_fit: { type: 'string' },
-                one_liner: { type: 'string' },
-                one_liner_he: { type: 'string' },
-                trend: { type: 'string', enum: ['up', 'down', 'flat'] },
-                rationale: { type: 'string' },
-                rationale_he: { type: 'string' },
-                earnings_track: { type: 'string' },
-                analyst_target: { type: 'number' },
-                analyst_consensus: { type: 'string' },
-                tam_growth: { type: 'string' },
-                key_catalysts: { type: 'array', items: { type: 'string' } },
-                key_risks: { type: 'array', items: { type: 'string' } },
-              }
-            }
-          }
-        }
-      }
-    });
-    const stocks = res?.stocks || [];
-    setResults(stocks);
+    try {
+      const data = await runScanner({ filters, lang });
+      setResults(data?.stocks || []);
+    } catch (e) {
+      console.error('[scanner] failed:', e);
+      setResults([]);
+    }
     setLoading(false);
     setScanned(true);
   };
@@ -379,3 +335,4 @@ For each stock, provide a detailed rationale explaining WHY it matches the strat
     </DashboardLayout>
   );
 }
+```
