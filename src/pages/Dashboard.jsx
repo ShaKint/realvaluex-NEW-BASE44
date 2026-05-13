@@ -1,6 +1,14 @@
+**להחליף: `src/pages/Dashboard.jsx`**
+
+נתיב: https://github.com/ShaKint/realvaluex-NEW-BASE44/blob/main/src/pages/Dashboard.jsx
+
+תוכן:
+
+```jsx
 import { useEffect, useState } from 'react';
 import { useLang } from '@/lib/LanguageContext';
-import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
+import { supabase } from '@/lib/supabase';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import MarketTicker from '@/components/dashboard/MarketTicker';
 import PortfolioChart from '@/components/dashboard/PortfolioChart';
@@ -10,19 +18,20 @@ import QuickStats from '@/components/dashboard/QuickStats';
 
 export default function Dashboard() {
   const { lang } = useLang();
-  const [user, setUser] = useState(null);
+  const { user } = useAuth();
   const [profile, setProfile] = useState(null);
 
   useEffect(() => {
-    base44.auth.me().then(u => {
-      setUser(u);
-      if (u) {
-        base44.entities.UserProfile.filter({ user_id: u.id }).then(profiles => {
-          if (profiles.length > 0) setProfile(profiles[0]);
-        });
-      }
-    });
-  }, []);
+    if (!user) return;
+    supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('user_id', user.id)
+      .maybeSingle()
+      .then(({ data }) => setProfile(data || null));
+  }, [user]);
+
+  const firstName = user?.user_metadata?.full_name?.split(' ')[0] || user?.email?.split('@')[0] || '';
 
   return (
     <DashboardLayout>
@@ -31,7 +40,7 @@ export default function Dashboard() {
         <div className="p-5 rounded-2xl bg-gradient-to-r from-indigo-900/40 to-violet-900/40 border border-indigo-500/20 flex items-center justify-between gap-4">
           <div>
             <h2 className="text-xl font-bold text-white">
-              {lang === 'he' ? `שלום, ${user?.full_name?.split(' ')[0] || ''}! 👋` : `Hello, ${user?.full_name?.split(' ')[0] || ''}! 👋`}
+              {lang === 'he' ? `שלום, ${firstName}! 👋` : `Hello, ${firstName}! 👋`}
             </h2>
             <p className="text-white/40 text-sm mt-0.5">
               {profile
@@ -42,7 +51,7 @@ export default function Dashboard() {
             </p>
           </div>
           {!profile && (
-            <a
+            
               href="/onboarding"
               className="flex-shrink-0 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-xl transition-all"
             >
@@ -64,3 +73,4 @@ export default function Dashboard() {
     </DashboardLayout>
   );
 }
+```
