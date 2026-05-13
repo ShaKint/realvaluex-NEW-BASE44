@@ -1,13 +1,4 @@
-**להוסיף קובץ חדש: `server/routes/valuation.js`**
-
-ב-GitHub: Add file → Create new file → שם: `server/routes/valuation.js`
-
-תוכן:
-
-```js
 // server/routes/valuation.js
-// Replaces: base44/functions/valuationEngine/entry.ts (Deno)
-// Uses Anthropic Claude Opus 4.6 for deep RealValueX v3.0 analysis
 
 import { Router } from 'express';
 import { anthropic } from '../index.js';
@@ -106,21 +97,21 @@ router.post('/', async (req, res) => {
 
     const isHebrew = lang === 'he';
     const langInstruction = isHebrew
-      ? 'IMPORTANT: Write ALL text fields in Hebrew (עברית). Use Hebrew financial terminology. Numbers and tickers remain in English.'
+      ? 'IMPORTANT: Write ALL text fields in Hebrew. Use Hebrew financial terminology. Numbers and tickers remain in English.'
       : 'Write all text fields in English.';
 
-    const prompt = `You are RealValueX™ v3.0 — an elite equity analyst using a rigorous 4-layer, 36-chapter stock analysis model. Analyze: ${ticker} (${company_name || ticker}).
+    const prompt = `You are RealValueX v3.0 - an elite equity analyst using a rigorous 4-layer, 36-chapter stock analysis model. Analyze: ${ticker} (${company_name || ticker}).
 
 ${langInstruction}
 
 User-provided financials (supplement with your knowledge if empty): ${JSON.stringify(financials || {})}
 
-Apply the full RealValueX™ framework across all 4 layers:
+Apply the full RealValueX framework across all 4 layers:
 
-LAYER 1 — Opportunity Engine: X-Factor, Moat Durability, Product Stage, Innovation Momentum
-LAYER 2 — Validation Engine: Fundamentals (3yr revenue/EPS/margins trend), ARR/SaaS metrics if relevant, Competition & Market Share, Institutional holders, Management Execution DNA (Promise vs Execution %), Geopolitical Risk, Sentiment
-LAYER 3 — Timing & Allocation Engine: Historical pricing vs 1/3/5/10yr averages, Technical levels (MA50/MA200/RSI), Valuation multiples vs sector peers, DCF + P/E + Graham Number, CAGR forecast 1/5/10/20yr, Bear/Base/Bull scenarios
-LAYER 4 — Monitoring & Decision Engine: Bubble Risk, Capital Allocation recommendation, Thesis Integrity, RUC (Remaining Upside Capacity), S31 Protocol score, TYPE classification (A/B/C)
+LAYER 1 - Opportunity Engine: X-Factor, Moat Durability, Product Stage, Innovation Momentum
+LAYER 2 - Validation Engine: Fundamentals (3yr revenue/EPS/margins trend), ARR/SaaS metrics if relevant, Competition & Market Share, Institutional holders, Management Execution DNA, Geopolitical Risk, Sentiment
+LAYER 3 - Timing & Allocation Engine: Historical pricing vs 1/3/5/10yr averages, Technical levels (MA50/MA200/RSI), Valuation multiples vs sector peers, DCF + P/E + Graham Number, CAGR forecast 1/5/10/20yr, Bear/Base/Bull scenarios
+LAYER 4 - Monitoring & Decision Engine: Bubble Risk, Capital Allocation recommendation, Thesis Integrity, RUC score, S31 Protocol score, TYPE classification (A/B/C)
 
 Cross-reference: analyst consensus targets, earnings beat/miss history (last 8 quarters), TAM size & CAGR, sector momentum, macro tailwinds/headwinds, insider activity.
 
@@ -151,4 +142,3 @@ Return the analysis as a single JSON object using the provided tool.`;
 });
 
 export default router;
-```
