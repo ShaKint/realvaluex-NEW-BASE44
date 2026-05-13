@@ -1,14 +1,3 @@
-הוספת `ws` ל-package.json לא מספיקה - Supabase דורש שנפעיל אותה במפורש. צריך לשלוח אותה ל-realtime client כ-transport.
-
-הפתרון: לשנות את `server/index.js` כך שיעביר `ws` מפורשות.
-
----
-
-**להחליף: `server/index.js`**
-
-נתיב: https://github.com/ShaKint/realvaluex-NEW-BASE44/blob/main/server/index.js
-
-```js
 // server/index.js
 // RealValueX Backend Service - runs on Railway
 
@@ -68,6 +57,3 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`[RealValueX backend] listening on :${PORT}`);
 });
-```
-
-לאחר commit, חכה 30-60 שניות ושלח את הלוג החדש.
