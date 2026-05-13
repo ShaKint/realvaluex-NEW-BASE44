@@ -1,7 +1,16 @@
+**להחליף: `src/pages/NewsFeed.jsx`**
+
+נתיב: https://github.com/ShaKint/realvaluex-NEW-BASE44/blob/main/src/pages/NewsFeed.jsx
+
+תוכן:
+
+```jsx
 import { useState, useEffect } from 'react';
 import { useLang } from '@/lib/LanguageContext';
-import { base44 } from '@/api/base44Client';
-import { Newspaper, RefreshCw, ExternalLink, TrendingUp, TrendingDown, Minus, Bookmark, Globe, Zap } from 'lucide-react';
+import { useAuth } from '@/lib/AuthContext';
+import { supabase } from '@/lib/supabase';
+import { fetchPersonalizedNews } from '@/lib/api-client';
+import { Newspaper, RefreshCw, TrendingUp, TrendingDown, Minus, Bookmark, Globe, Zap } from 'lucide-react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 
 const CATEGORIES = {
@@ -39,6 +48,7 @@ const ImpactIcon = ({ impact }) => {
 
 export default function NewsFeed() {
   const { lang } = useLang();
+  const { user } = useAuth();
   const [news, setNews] = useState([]);
   const [loading, setLoading] = useState(false);
   const [profile, setProfile] = useState(null);
@@ -47,66 +57,28 @@ export default function NewsFeed() {
 
   const fetchNews = async (prof) => {
     setLoading(true);
-    const sectors = prof?.preferred_sectors?.join(', ') || 'technology, finance, energy';
-    const markets = prof?.active_markets?.join(', ') || 'US markets';
-    const style = prof?.investing_styles?.join(', ') || 'fundamental';
-
-    const res = await base44.integrations.Core.InvokeLLM({
-      prompt: `You are a financial news curator for an investment platform. Generate 16 realistic, varied financial news items from today (${new Date().toDateString()}).
-
-User profile:
-- Preferred sectors: ${sectors}
-- Active markets: ${markets}
-- Investment style: ${style}
-
-Mix: macro news, earnings reports, sector news, Fed/rates news.
-Vary the market impact (bullish/bearish/neutral).
-Make them realistic and informative.
-Include Hebrew translation for each headline if the article is significant.`,
-      add_context_from_internet: true,
-      response_json_schema: {
-        type: 'object',
-        properties: {
-          news: {
-            type: 'array',
-            items: {
-              type: 'object',
-              properties: {
-                id: { type: 'string' },
-                headline: { type: 'string' },
-                headline_he: { type: 'string' },
-                summary: { type: 'string' },
-                summary_he: { type: 'string' },
-                source: { type: 'string' },
-                category: { type: 'string', enum: ['macro', 'earnings', 'tech', 'fed', 'crypto', 'geopolitical'] },
-                impact: { type: 'string', enum: ['bullish', 'bearish', 'neutral'] },
-                tickers: { type: 'array', items: { type: 'string' } },
-                time_ago: { type: 'string' },
-                relevance_score: { type: 'number' },
-              }
-            }
-          }
-        }
-      }
-    });
-
-    setNews(res?.news || []);
+    try {
+      const data = await fetchPersonalizedNews({ profile: prof, lang });
+      setNews(data?.news || []);
+    } catch (e) {
+      console.error('[news] fetch failed:', e);
+      setNews([]);
+    }
     setLoading(false);
   };
 
   useEffect(() => {
-    base44.auth.me().then(u => {
-      if (u) {
-        base44.entities.UserProfile.filter({ user_id: u.id }).then(profiles => {
-          const prof = profiles?.[0] || null;
-          setProfile(prof);
-          fetchNews(prof);
-        });
-      } else {
-        fetchNews(null);
-      }
-    });
-  }, []);
+    if (!user) { fetchNews(null); return; }
+    supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('user_id', user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        setProfile(data || null);
+        fetchNews(data || null);
+      });
+  }, [user]);
 
   const filtered = category === 'all' ? news : news.filter(n => n.category === category);
   const toggleSave = (id) => setSaved(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
@@ -254,3 +226,4 @@ Include Hebrew translation for each headline if the article is significant.`,
     </DashboardLayout>
   );
 }
+```
