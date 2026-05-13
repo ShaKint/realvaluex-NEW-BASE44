@@ -1,6 +1,13 @@
+**להחליף: `src/components/dashboard/MarketNews.jsx`**
+
+נתיב: https://github.com/ShaKint/realvaluex-NEW-BASE44/blob/main/src/components/dashboard/MarketNews.jsx
+
+תוכן:
+
+```jsx
 import { useState } from 'react';
 import { useLang } from '@/lib/LanguageContext';
-import { base44 } from '@/api/base44Client';
+import { fetchMarketNews } from '@/lib/api-client';
 import { Newspaper, ExternalLink, RefreshCw } from 'lucide-react';
 
 const INITIAL_NEWS = [
@@ -19,33 +26,11 @@ export default function MarketNews() {
 
   const loadMore = async () => {
     setLoading(true);
-    const result = await base44.integrations.Core.InvokeLLM({
-      prompt: `Generate 4 realistic financial market news headlines for today. 
-      These should be different from: ${news.map(n => n.title_en).join(', ')}.
-      Mix of positive, negative, and neutral market news about stocks, economy, tech, crypto, and global markets.
-      Return as JSON array.`,
-      add_context_from_internet: true,
-      response_json_schema: {
-        type: 'object',
-        properties: {
-          items: {
-            type: 'array',
-            items: {
-              type: 'object',
-              properties: {
-                title_en: { type: 'string' },
-                title_he: { type: 'string' },
-                source: { type: 'string' },
-                impact: { type: 'string', enum: ['positive', 'negative', 'neutral'] },
-                time: { type: 'string' }
-              }
-            }
-          }
-        }
-      }
-    });
-    if (result?.items?.length) {
-      setNews(prev => [...prev, ...result.items]);
+    try {
+      const data = await fetchMarketNews({ existing: news.map(n => n.title_en), lang });
+      if (data?.items?.length) setNews(prev => [...prev, ...data.items]);
+    } catch (e) {
+      console.error('[market-news] failed:', e);
     }
     setLoading(false);
   };
@@ -92,3 +77,4 @@ export default function MarketNews() {
     </div>
   );
 }
+```
