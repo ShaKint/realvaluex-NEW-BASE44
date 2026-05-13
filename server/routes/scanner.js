@@ -1,12 +1,4 @@
-**להוסיף קובץ חדש: `server/routes/scanner.js`**
-
-ב-GitHub: Add file → Create new file → שם: `server/routes/scanner.js`
-
-תוכן:
-
-```js
 // server/routes/scanner.js
-// Replaces: base44.integrations.Core.InvokeLLM call in src/pages/Scanner.jsx
 
 import { Router } from 'express';
 import { anthropic } from '../index.js';
@@ -51,10 +43,10 @@ router.post('/', async (req, res) => {
   try {
     const { filters = {}, lang = 'en' } = req.body || {};
     const hebrewBlock = lang === 'he'
-      ? ' IMPORTANT: Write ALL text fields (one_liner_he, rationale_he, strategy_fit, earnings_track, tam_growth, analyst_consensus, key_catalysts, key_risks) in Hebrew (עברית). Numbers and tickers remain in English.'
+      ? ' IMPORTANT: Write ALL text fields (one_liner_he, rationale_he, strategy_fit, earnings_track, tam_growth, analyst_consensus, key_catalysts, key_risks) in Hebrew. Numbers and tickers remain in English.'
       : '';
 
-    const prompt = `You are a stock screener AI for the RealValueX™ platform.${hebrewBlock}
+    const prompt = `You are a stock screener AI for the RealValueX platform.${hebrewBlock}
 
 Generate a realistic list of 12 stocks matching these filters:
 - Sector: ${filters.sector === 'all' ? 'any sector' : filters.sector}
@@ -68,7 +60,7 @@ Return realistic stock data with tickers from US markets (NYSE/NASDAQ). Each sto
 
 For each stock, provide a detailed rationale explaining WHY it matches the strategy, including:
 - Market/industry TAM growth projections and trends
-- Historical earnings beats/misses track record (e.g. "beat estimates 8/8 quarters")
+- Historical earnings beats/misses track record
 - Analyst consensus and price targets
 - Key financial metrics driving the thesis (revenue growth rate, margins, FCF)
 - Specific catalysts that could unlock value
@@ -95,4 +87,3 @@ For each stock, provide a detailed rationale explaining WHY it matches the strat
 });
 
 export default router;
-```
