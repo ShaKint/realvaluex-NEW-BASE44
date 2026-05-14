@@ -10,6 +10,7 @@ import scannerRouter from './routes/scanner.js';
 import newsRouter from './routes/news.js';
 import marketNewsRouter from './routes/market-news.js';
 import stocksRouter from './routes/stocks.js';
+import analysisRouter from './routes/analysis.js';
 const app = express();
 app.use(cors({
   origin: (process.env.CORS_ORIGINS || '').split(',').filter(Boolean),
@@ -44,6 +45,7 @@ app.use('/api/scanner', requireAuth, scannerRouter);
 app.use('/api/news', requireAuth, newsRouter);
 app.use('/api/market-news', requireAuth, marketNewsRouter);
 app.use('/api/stocks', requireAuth, stocksRouter);
+app.use('/api/analysis', requireAuth, analysisRouter);
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`[RealValueX backend] listening on :${PORT}`);
