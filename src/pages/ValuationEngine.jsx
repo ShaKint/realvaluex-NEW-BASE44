@@ -1,6 +1,4 @@
-
-
-```jsx
+jsx
 import { useState } from 'react';
 import { useLang } from '@/lib/LanguageContext';
 import { runValuation } from '@/lib/api-client';
