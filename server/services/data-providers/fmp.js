@@ -238,7 +238,8 @@ const fmpProvider = {
 
   /**
    * Get historical daily closing prices for the last N days.
-   * Returns array sorted newest-first (matches FMP response order).
+   * Uses FMP stable endpoint: /stable/historical-price-eod/light
+   * (Note: slash between 'eod' and 'light', not hyphen)
    *
    * @param {string} ticker
    * @param {number} days - Number of calendar days back (default 90)
@@ -249,7 +250,7 @@ const fmpProvider = {
     const fromDateMs = Date.now() - days * 86400000;
     const fromDate = new Date(fromDateMs).toISOString().split('T')[0];
 
-    const raw = await fmpRequest('historical-price-eod-light', {
+    const raw = await fmpRequest('historical-price-eod/light', {
       symbol: ticker,
       from: fromDate,
       to: toDate,
