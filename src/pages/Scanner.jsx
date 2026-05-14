@@ -265,3 +265,6 @@ export default function Scanner() {
           </div>
         )}
       </div>
+    </DashboardLayout>
+  );
+}
