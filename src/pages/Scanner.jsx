@@ -1,4 +1,3 @@
-jsx
 import { useState } from 'react';
 import { useLang } from '@/lib/LanguageContext';
 import { ScanSearch, Filter, TrendingUp, TrendingDown, Minus, RefreshCw, ChevronDown, ChevronUp, BookOpen } from 'lucide-react';
@@ -80,7 +79,6 @@ export default function Scanner() {
   return (
     <DashboardLayout>
       <div className="p-4 sm:p-6 space-y-6 max-w-5xl mx-auto">
-        {/* Header */}
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center">
             <ScanSearch className="w-5 h-5 text-white" />
@@ -91,48 +89,33 @@ export default function Scanner() {
           </div>
         </div>
 
-        {/* Filters */}
         <div className="p-5 rounded-2xl bg-white/5 border border-white/5 space-y-5">
-          {/* Strategy */}
           <div>
             <div className="text-white/50 text-xs mb-2">{lang === 'he' ? 'אסטרטגיה' : 'Strategy'}</div>
             <div className="flex flex-wrap gap-2">
               {STRATEGIES[lang].map(s => (
-                <button key={s.key}
-                  onClick={() => setFilters(f => ({ ...f, strategy: f.strategy === s.key ? '' : s.key }))}
-                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-sm transition-all ${filters.strategy === s.key ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-white/5 border-white/10 text-white/50 hover:text-white hover:border-white/25'}`}
-                >
+                <button key={s.key} onClick={() => setFilters(f => ({ ...f, strategy: f.strategy === s.key ? '' : s.key }))} className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-sm transition-all ${filters.strategy === s.key ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-white/5 border-white/10 text-white/50 hover:text-white hover:border-white/25'}`}>
                   <span>{s.icon}</span><span>{s.label}</span>
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Sector + Market Cap */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <div className="text-white/50 text-xs mb-2">{lang === 'he' ? 'סקטור' : 'Sector'}</div>
-              <select
-                value={filters.sector}
-                onChange={e => setFilters(f => ({ ...f, sector: e.target.value }))}
-                className="w-full bg-slate-800 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500"
-              >
+              <select value={filters.sector} onChange={e => setFilters(f => ({ ...f, sector: e.target.value }))} className="w-full bg-slate-800 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500">
                 {SECTORS[lang].map((s, i) => <option key={i} value={SECTOR_VALS[i]}>{s}</option>)}
               </select>
             </div>
             <div>
               <div className="text-white/50 text-xs mb-2">{lang === 'he' ? 'שווי שוק' : 'Market Cap'}</div>
-              <select
-                value={filters.marketCap}
-                onChange={e => setFilters(f => ({ ...f, marketCap: e.target.value }))}
-                className="w-full bg-slate-800 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500"
-              >
+              <select value={filters.marketCap} onChange={e => setFilters(f => ({ ...f, marketCap: e.target.value }))} className="w-full bg-slate-800 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500">
                 {MARKET_CAPS[lang].map(m => <option key={m.key} value={m.key}>{m.label}</option>)}
               </select>
             </div>
           </div>
 
-          {/* Advanced */}
           <button onClick={() => setShowAdvanced(v => !v)} className="flex items-center gap-1.5 text-white/40 hover:text-white/70 text-xs transition-colors">
             <Filter className="w-3.5 h-3.5" />
             {lang === 'he' ? 'פילטרים מתקדמים' : 'Advanced Filters'}
@@ -148,29 +131,18 @@ export default function Scanner() {
               ].map(f => (
                 <div key={f.key}>
                   <div className="text-white/50 text-xs mb-1.5">{f.label}</div>
-                  <input
-                    type="number"
-                    value={filters[f.key]}
-                    onChange={e => setFilters(p => ({ ...p, [f.key]: e.target.value }))}
-                    placeholder="—"
-                    className="w-full bg-slate-800 border border-white/10 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
-                  />
+                  <input type="number" value={filters[f.key]} onChange={e => setFilters(p => ({ ...p, [f.key]: e.target.value }))} placeholder="—" className="w-full bg-slate-800 border border-white/10 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500" />
                 </div>
               ))}
             </div>
           )}
 
-          <button
-            onClick={handleScan}
-            disabled={loading}
-            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 disabled:opacity-50 text-white font-semibold transition-all"
-          >
+          <button onClick={handleScan} disabled={loading} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 disabled:opacity-50 text-white font-semibold transition-all">
             {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <ScanSearch className="w-4 h-4" />}
             {lang === 'he' ? 'סרוק עכשיו' : 'Scan Now'}
           </button>
         </div>
 
-        {/* Loading */}
         {loading && (
           <div className="text-center py-12">
             <div className="w-12 h-12 rounded-full border-4 border-cyan-500/20 border-t-cyan-500 animate-spin mx-auto mb-4" />
@@ -178,22 +150,17 @@ export default function Scanner() {
           </div>
         )}
 
-        {/* Results */}
         {scanned && !loading && (
           <div>
             <div className="flex items-center justify-between mb-3">
-              <div className="text-white/50 text-sm">
-                {lang === 'he' ? `נמצאו ${results.length} מניות` : `${results.length} stocks found`}
-              </div>
+              <div className="text-white/50 text-sm">{lang === 'he' ? `נמצאו ${results.length} מניות` : `${results.length} stocks found`}</div>
               <div className="flex items-center gap-2 text-xs text-white/30">
                 {[
                   { col: 'upside', label: lang === 'he' ? 'פוטנציאל' : 'Upside' },
                   { col: 'pe', label: 'P/E' },
                   { col: 'score', label: lang === 'he' ? 'ציון' : 'Score' },
                 ].map(s => (
-                  <button key={s.col} onClick={() => toggleSort(s.col)}
-                    className={`flex items-center gap-0.5 px-2 py-1 rounded-lg transition-colors ${sortBy === s.col ? 'text-cyan-400 bg-cyan-500/10' : 'hover:text-white/60'}`}
-                  >
+                  <button key={s.col} onClick={() => toggleSort(s.col)} className={`flex items-center gap-0.5 px-2 py-1 rounded-lg transition-colors ${sortBy === s.col ? 'text-cyan-400 bg-cyan-500/10' : 'hover:text-white/60'}`}>
                     {s.label} {sortBy === s.col && (sortDir === 'desc' ? '↓' : '↑')}
                   </button>
                 ))}
@@ -208,9 +175,7 @@ export default function Scanner() {
                   <div className="p-4">
                     <div className="flex items-start justify-between gap-3 flex-wrap">
                       <div className="flex items-start gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center font-bold text-white text-xs flex-shrink-0">
-                          {stock.ticker?.slice(0, 4)}
-                        </div>
+                        <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center font-bold text-white text-xs flex-shrink-0">{stock.ticker?.slice(0, 4)}</div>
                         <div>
                           <div className="flex items-center gap-2">
                             <span className="font-bold text-white">{stock.ticker}</span>
@@ -230,32 +195,20 @@ export default function Scanner() {
                           {(stock.upside_potential || 0) > 0 ? '+' : ''}{stock.upside_potential?.toFixed(0)}%
                         </div>
                         <div className="flex items-center gap-1">
-                          {[...Array(5)].map((_, j) => (
-                            <div key={j} className={`w-1.5 h-4 rounded-full ${j < Math.round((stock.score || 0) / 20) ? 'bg-indigo-500' : 'bg-white/10'}`} />
-                          ))}
+                          {[...Array(5)].map((_, j) => <div key={j} className={`w-1.5 h-4 rounded-full ${j < Math.round((stock.score || 0) / 20) ? 'bg-indigo-500' : 'bg-white/10'}`} />)}
                         </div>
                       </div>
                     </div>
-                    {stock.strategy_fit && (
-                      <div className="mt-2 text-xs text-indigo-300/60 flex items-center gap-1">
-                        <span>✦</span> {stock.strategy_fit}
-                      </div>
-                    )}
-                    {/* Rationale toggle */}
-                    <button
-                      onClick={() => setExpandedIdx(isExpanded ? null : i)}
-                      className="mt-3 flex items-center gap-1.5 text-xs text-cyan-400/70 hover:text-cyan-400 transition-colors"
-                    >
+                    {stock.strategy_fit && <div className="mt-2 text-xs text-indigo-300/60 flex items-center gap-1"><span>✦</span> {stock.strategy_fit}</div>}
+                    <button onClick={() => setExpandedIdx(isExpanded ? null : i)} className="mt-3 flex items-center gap-1.5 text-xs text-cyan-400/70 hover:text-cyan-400 transition-colors">
                       <BookOpen className="w-3.5 h-3.5" />
                       {lang === 'he' ? (isExpanded ? 'הסתר רציונל' : 'הצג רציונל מלא') : (isExpanded ? 'Hide Rationale' : 'Show Full Rationale')}
                       {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                     </button>
                   </div>
 
-                  {/* Expanded rationale */}
                   {isExpanded && (
                     <div className="border-t border-white/5 p-4 space-y-4 bg-slate-900/40">
-                      {/* Main rationale */}
                       {(lang === 'he' ? stock.rationale_he : stock.rationale) && (
                         <div>
                           <div className="text-white/40 text-xs uppercase tracking-widest mb-2">{lang === 'he' ? 'ניתוח מלא' : 'Full Analysis'}</div>
@@ -264,24 +217,19 @@ export default function Scanner() {
                       )}
 
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        {/* Analyst consensus */}
                         {stock.analyst_consensus && (
                           <div className="p-3 rounded-xl bg-white/5">
                             <div className="text-white/35 text-xs mb-1">{lang === 'he' ? 'קונצנזוס אנליסטים' : 'Analyst Consensus'}</div>
                             <div className="text-white font-semibold text-sm">{stock.analyst_consensus}</div>
-                            {stock.analyst_target && (
-                              <div className="text-emerald-400 text-xs mt-0.5">{lang === 'he' ? 'יעד:' : 'Target:'} ${stock.analyst_target}</div>
-                            )}
+                            {stock.analyst_target && <div className="text-emerald-400 text-xs mt-0.5">{lang === 'he' ? 'יעד:' : 'Target:'} ${stock.analyst_target}</div>}
                           </div>
                         )}
-                        {/* Earnings track */}
                         {stock.earnings_track && (
                           <div className="p-3 rounded-xl bg-white/5">
                             <div className="text-white/35 text-xs mb-1">{lang === 'he' ? 'רצף הכנסות' : 'Earnings Track'}</div>
                             <div className="text-white text-sm">{stock.earnings_track}</div>
                           </div>
                         )}
-                        {/* TAM growth */}
                         {stock.tam_growth && (
                           <div className="p-3 rounded-xl bg-white/5">
                             <div className="text-white/35 text-xs mb-1">{lang === 'he' ? 'צמיחת שוק (TAM)' : 'Market Growth (TAM)'}</div>
@@ -290,17 +238,12 @@ export default function Scanner() {
                         )}
                       </div>
 
-                      {/* Catalysts & Risks */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {stock.key_catalysts?.length > 0 && (
                           <div>
                             <div className="text-emerald-400/60 text-xs uppercase tracking-widest mb-2">{lang === 'he' ? 'קטליזטורים' : 'Catalysts'}</div>
                             <ul className="space-y-1">
-                              {stock.key_catalysts.map((c, ci) => (
-                                <li key={ci} className="flex items-start gap-2 text-white/60 text-xs">
-                                  <span className="text-emerald-400 mt-0.5">▲</span> {c}
-                                </li>
-                              ))}
+                              {stock.key_catalysts.map((c, ci) => <li key={ci} className="flex items-start gap-2 text-white/60 text-xs"><span className="text-emerald-400 mt-0.5">▲</span> {c}</li>)}
                             </ul>
                           </div>
                         )}
@@ -308,11 +251,7 @@ export default function Scanner() {
                           <div>
                             <div className="text-rose-400/60 text-xs uppercase tracking-widest mb-2">{lang === 'he' ? 'סיכונים' : 'Risks'}</div>
                             <ul className="space-y-1">
-                              {stock.key_risks.map((r, ri) => (
-                                <li key={ri} className="flex items-start gap-2 text-white/60 text-xs">
-                                  <span className="text-rose-400 mt-0.5">▼</span> {r}
-                                </li>
-                              ))}
+                              {stock.key_risks.map((r, ri) => <li key={ri} className="flex items-start gap-2 text-white/60 text-xs"><span className="text-rose-400 mt-0.5">▼</span> {r}</li>)}
                             </ul>
                           </div>
                         )}
@@ -326,7 +265,3 @@ export default function Scanner() {
           </div>
         )}
       </div>
-    </DashboardLayout>
-  );
-}
-```
