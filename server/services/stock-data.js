@@ -1,243 +1,198 @@
 /**
- * @file Stock Data Facade
- * @description Single entry point for all stock data needs.
- * Handles: cache lookup, provider call, cache write.
+ * @file Stock Data routes - thin wrapper around the stock-data Facade
+ * @description Endpoints for testing the data layer and serving raw stock data.
  *
- * Architecture: Cache stores NORMALIZED data (not raw provider responses).
- *
- * Routes should ONLY use this module, not call providers directly.
+ * Mounted at: /api/stocks/*
  */
 
+import express from 'express';
 import { createClient } from '@supabase/supabase-js';
-import { getProvider } from './data-providers/index.js';
-import { ProviderError } from './data-providers/interface.js';
+import WebSocket from 'ws';
+import * as stockData from '../services/stock-data.js';
 
-// ============================================================================
-// Supabase client (service_role - bypasses RLS)
-// ============================================================================
-let _supabase = null;
-function getSupabase() {
-  if (_supabase) return _supabase;
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) {
-    throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set');
+const router = express.Router();
+
+function handleError(res, err) {
+  console.error('[stocks route] error:', err.message, err.stack);
+  if (err.name === 'ProviderError') {
+    return res.status(err.statusCode || 502).json({
+      error: 'Provider error',
+      message: err.message,
+      provider: err.provider,
+      retryable: err.retryable,
+    });
   }
-  _supabase = createClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
+  return res.status(500).json({
+    error: 'Internal error',
+    message: err.message,
   });
-  return _supabase;
 }
 
 // ============================================================================
-// Cache key builder
+// DIAGNOSTIC ENDPOINT - temporary, for debugging cache write issues
 // ============================================================================
-function buildCacheKey(provider, endpoint, symbol, extraParams = null) {
-  let key = `${provider}:${endpoint}:${symbol.toUpperCase()}`;
-  if (extraParams) {
-    const paramStr = Object.entries(extraParams)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([k, v]) => `${k}${v}`)
-      .join('');
-    if (paramStr) key += `:${paramStr}`;
-  }
-  return key;
-}
+router.get('/cache-debug', async (req, res) => {
+  const diagnostics = {
+    env_check: {},
+    supabase_init: null,
+    insert_test: null,
+    select_test: null,
+  };
 
-// ============================================================================
-// Cache operations
-// ============================================================================
-async function readCache(cacheKey) {
+  // Step 1: Check env vars exist
+  diagnostics.env_check.SUPABASE_URL_present = !!process.env.SUPABASE_URL;
+  diagnostics.env_check.SUPABASE_URL_value = process.env.SUPABASE_URL ? process.env.SUPABASE_URL.substring(0, 30) + '...' : null;
+  diagnostics.env_check.SUPABASE_SERVICE_ROLE_KEY_present = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
+  diagnostics.env_check.SUPABASE_SERVICE_ROLE_KEY_length = process.env.SUPABASE_SERVICE_ROLE_KEY?.length || 0;
+  // Show key prefix (first 15 chars) to identify type
+  diagnostics.env_check.SUPABASE_SERVICE_ROLE_KEY_prefix = process.env.SUPABASE_SERVICE_ROLE_KEY?.substring(0, 15) || null;
+  // Try JWT decode
   try {
-    const { data, error } = await getSupabase()
-      .from('external_data_cache')
-      .select('data')
-      .eq('cache_key', cacheKey)
-      .gt('expires_at', new Date().toISOString())
-      .maybeSingle();
-
-    if (error) {
-      console.warn(`[stock-data] cache read error for ${cacheKey}:`, error.message);
-      return null;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+    const parts = key.split('.');
+    if (parts.length === 3) {
+      const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+      diagnostics.env_check.key_role = payload.role || 'unknown';
+    } else {
+      diagnostics.env_check.key_role = 'not-a-jwt';
     }
-    if (!data) return null;
+  } catch (e) {
+    diagnostics.env_check.key_role_decode_error = e.message;
+  }
 
-    incrementHitCount(cacheKey).catch(err =>
-      console.warn(`[stock-data] hit count increment failed:`, err.message)
+  // Step 2: Initialize Supabase client WITH WebSocket transport (Node 20 requirement)
+  let supabase;
+  try {
+    supabase = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY,
+      {
+        auth: { persistSession: false, autoRefreshToken: false },
+        realtime: { transport: WebSocket },
+      }
     );
-
-    return data.data;
+    diagnostics.supabase_init = 'ok';
   } catch (err) {
-    console.warn(`[stock-data] cache read exception:`, err.message);
-    return null;
+    diagnostics.supabase_init = `error: ${err.message}`;
+    return res.json(diagnostics);
   }
-}
 
-async function writeCache(cacheKey, provider, endpoint, symbol, normalizedData, ttlSeconds, params = null) {
+  // Step 3: Try an INSERT
   try {
-    const expiresAt = new Date(Date.now() + ttlSeconds * 1000).toISOString();
-    const { error } = await getSupabase()
+    const testKey = `diagnostic:test:${Date.now()}`;
+    const { data, error } = await supabase
       .from('external_data_cache')
-      .upsert({
-        cache_key: cacheKey,
-        provider,
-        endpoint,
-        symbol: symbol.toUpperCase(),
-        params,
-        data: normalizedData,
-        status_code: 200,
-        fetched_at: new Date().toISOString(),
-        expires_at: expiresAt,
-        hit_count: 0,
-        last_hit_at: null,
-      }, { onConflict: 'cache_key' });
+      .insert({
+        cache_key: testKey,
+        provider: 'fmp',
+        endpoint: 'debug',
+        symbol: 'DEBUG',
+        data: { diagnostic: true, ts: Date.now() },
+        expires_at: new Date(Date.now() + 60000).toISOString(),
+      })
+      .select();
 
     if (error) {
-      console.warn(`[stock-data] cache write error for ${cacheKey}:`, error.message);
+      diagnostics.insert_test = {
+        ok: false,
+        error_message: error.message,
+        error_code: error.code,
+        error_details: error.details,
+        error_hint: error.hint,
+      };
+    } else {
+      diagnostics.insert_test = {
+        ok: true,
+        rows_inserted: data?.length || 0,
+        inserted_key: testKey,
+      };
     }
   } catch (err) {
-    console.warn(`[stock-data] cache write exception:`, err.message);
-  }
-}
-
-async function incrementHitCount(cacheKey) {
-  const { data } = await getSupabase()
-    .from('external_data_cache')
-    .select('hit_count')
-    .eq('cache_key', cacheKey)
-    .maybeSingle();
-  if (!data) return;
-  await getSupabase()
-    .from('external_data_cache')
-    .update({
-      hit_count: (data.hit_count || 0) + 1,
-      last_hit_at: new Date().toISOString(),
-    })
-    .eq('cache_key', cacheKey);
-}
-
-// ============================================================================
-// Generic fetch-with-cache wrapper
-// ============================================================================
-async function fetchWithCache(endpoint, ticker, extraParams, fetchFn) {
-  if (!ticker || typeof ticker !== 'string') {
-    throw new Error('Ticker is required and must be a string');
-  }
-  const tickerUpper = ticker.toUpperCase();
-  const provider = getProvider();
-  const cacheKey = buildCacheKey(provider.name, endpoint, tickerUpper, extraParams);
-
-  const cached = await readCache(cacheKey);
-  if (cached !== null) {
-    return cached;
+    diagnostics.insert_test = { ok: false, exception: err.message };
   }
 
-  const normalized = await fetchFn();
-
-  const ttl = provider.getTTL(endpoint);
-  writeCache(cacheKey, provider.name, endpoint, tickerUpper, normalized, ttl, extraParams)
-    .catch(err => console.warn(`[stock-data] background cache write failed:`, err.message));
-
-  return normalized;
-}
-
-// ============================================================================
-// Public API
-// ============================================================================
-
-export async function getProfile(ticker) {
-  return await fetchWithCache(
-    'profile',
-    ticker,
-    null,
-    () => getProvider().getProfile(ticker)
-  );
-}
-
-export async function getQuote(ticker) {
-  return await fetchWithCache(
-    'quote',
-    ticker,
-    null,
-    () => getProvider().getQuote(ticker)
-  );
-}
-
-export async function getKeyMetricsTTM(ticker) {
-  return await fetchWithCache(
-    'key-metrics-ttm',
-    ticker,
-    null,
-    () => getProvider().getKeyMetricsTTM(ticker)
-  );
-}
-
-export async function getEarningsHistory(ticker, limit = 24) {
-  return await fetchWithCache(
-    'earnings',
-    ticker,
-    { limit },
-    () => getProvider().getEarningsHistory(ticker, limit)
-  );
-}
-
-export async function getPriceTargetConsensus(ticker) {
-  return await fetchWithCache(
-    'price-target-consensus',
-    ticker,
-    null,
-    () => getProvider().getPriceTargetConsensus(ticker)
-  );
-}
-
-/**
- * Manually invalidate cache for a ticker.
- */
-export async function invalidateCache(ticker, endpoint) {
-  const supabase = getSupabase();
-  let query = supabase
-    .from('external_data_cache')
-    .delete()
-    .eq('symbol', ticker.toUpperCase());
-  if (endpoint) query = query.eq('endpoint', endpoint);
-  const { error, count } = await query;
-  if (error) throw new Error(`Cache invalidation failed: ${error.message}`);
-  return count || 0;
-}
-
-/**
- * Smoke test - verify the data layer works end-to-end.
- */
-export async function smokeTest(ticker = 'AAPL') {
-  const results = {};
-  const tests = [
-    ['profile', () => getProfile(ticker)],
-    ['quote', () => getQuote(ticker)],
-    ['keyMetrics', () => getKeyMetricsTTM(ticker)],
-    ['earnings', () => getEarningsHistory(ticker, 8)],
-    ['priceTarget', () => getPriceTargetConsensus(ticker)],
-  ];
-  for (const [name, fn] of tests) {
-    const start = Date.now();
-    try {
-      const data = await fn();
-      results[name] = {
-        ok: true,
-        durationMs: Date.now() - start,
-        hasData: data !== null && data !== undefined,
-        sample: name === 'earnings' ? `${data?.length || 0} entries` : 'object',
-      };
-    } catch (err) {
-      results[name] = {
-        ok: false,
-        durationMs: Date.now() - start,
-        error: err.message,
-        provider: err.provider,
-        statusCode: err.statusCode,
-      };
+  // Step 4: SELECT to verify
+  try {
+    const { data, error } = await supabase
+      .from('external_data_cache')
+      .select('cache_key, symbol, fetched_at')
+      .order('fetched_at', { ascending: false })
+      .limit(5);
+    if (error) {
+      diagnostics.select_test = { ok: false, error_message: error.message };
+    } else {
+      diagnostics.select_test = { ok: true, rows: data || [] };
     }
+  } catch (err) {
+    diagnostics.select_test = { ok: false, exception: err.message };
   }
-  return results;
-}
 
-export { ProviderError };
+  res.json(diagnostics);
+});
+
+// ============================================================================
+// Regular routes
+// ============================================================================
+
+router.get('/smoke-test', async (req, res) => {
+  try {
+    const ticker = (req.query.ticker || 'AAPL').toString().toUpperCase();
+    const results = await stockData.smokeTest(ticker);
+    const allOk = Object.values(results).every(r => r.ok);
+    res.status(allOk ? 200 : 207).json({ ticker, allOk, results });
+  } catch (err) {
+    handleError(res, err);
+  }
+});
+
+router.get('/:ticker/profile', async (req, res) => {
+  try {
+    const profile = await stockData.getProfile(req.params.ticker);
+    if (!profile) return res.status(404).json({ error: 'Not found', ticker: req.params.ticker });
+    res.json(profile);
+  } catch (err) {
+    handleError(res, err);
+  }
+});
+
+router.get('/:ticker/quote', async (req, res) => {
+  try {
+    const quote = await stockData.getQuote(req.params.ticker);
+    if (!quote) return res.status(404).json({ error: 'Not found', ticker: req.params.ticker });
+    res.json(quote);
+  } catch (err) {
+    handleError(res, err);
+  }
+});
+
+router.get('/:ticker/key-metrics', async (req, res) => {
+  try {
+    const metrics = await stockData.getKeyMetricsTTM(req.params.ticker);
+    if (!metrics) return res.status(404).json({ error: 'Not found', ticker: req.params.ticker });
+    res.json(metrics);
+  } catch (err) {
+    handleError(res, err);
+  }
+});
+
+router.get('/:ticker/earnings', async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit) || 24, 40);
+    const earnings = await stockData.getEarningsHistory(req.params.ticker, limit);
+    res.json({ ticker: req.params.ticker.toUpperCase(), count: earnings.length, entries: earnings });
+  } catch (err) {
+    handleError(res, err);
+  }
+});
+
+router.get('/:ticker/price-target', async (req, res) => {
+  try {
+    const target = await stockData.getPriceTargetConsensus(req.params.ticker);
+    if (!target) return res.status(404).json({ error: 'Not found', ticker: req.params.ticker });
+    res.json(target);
+  } catch (err) {
+    handleError(res, err);
+  }
+});
+
+export default router;
