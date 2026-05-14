@@ -1,6 +1,4 @@
-
-
-```jsx
+jsx
 // src/pages/Alerts.jsx
 // FULL REWRITE: base44.entities.Alert → supabase.from('alerts')
 // base44.auth.me() → useAuth() context
