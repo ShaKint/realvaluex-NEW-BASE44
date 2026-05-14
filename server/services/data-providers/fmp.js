@@ -12,9 +12,6 @@ const REQUEST_TIMEOUT_MS = 15000;
 
 /**
  * Make a request to FMP API.
- * @param {string} endpoint
- * @param {Object} params
- * @returns {Promise<any>}
  */
 async function fmpRequest(endpoint, params = {}) {
   const apiKey = process.env.FMP_API_KEY;
@@ -181,6 +178,19 @@ function normalizePriceTarget(raw) {
   };
 }
 
+/**
+ * Normalize a historical price entry from FMP's "light" endpoint.
+ * FMP response: { symbol, date, price, volume }
+ */
+function normalizeHistoricalPrice(raw) {
+  if (!raw || !raw.date) return null;
+  return {
+    date: raw.date,
+    close: raw.price ?? null,
+    volume: raw.volume ?? null,
+  };
+}
+
 // ============================================================================
 // TTL Policy (seconds)
 // ============================================================================
@@ -190,6 +200,7 @@ const TTL_POLICY = {
   'key-metrics-ttm': 24 * 60 * 60,
   'earnings': 24 * 60 * 60,
   'price-target-consensus': 24 * 60 * 60,
+  'historical-prices': 24 * 60 * 60,
 };
 const DEFAULT_TTL = 60 * 60;
 
@@ -223,6 +234,38 @@ const fmpProvider = {
   async getPriceTargetConsensus(ticker) {
     const raw = await fmpRequest('price-target-consensus', { symbol: ticker });
     return normalizePriceTarget(unwrapSingle(raw));
+  },
+
+  /**
+   * Get historical daily closing prices for the last N days.
+   * Returns array sorted newest-first (matches FMP response order).
+   *
+   * @param {string} ticker
+   * @param {number} days - Number of calendar days back (default 90)
+   * @returns {Promise<Array<{date: string, close: number, volume: number}>>}
+   */
+  async getHistoricalPrices(ticker, days = 90) {
+    const toDate = new Date().toISOString().split('T')[0];
+    const fromDateMs = Date.now() - days * 86400000;
+    const fromDate = new Date(fromDateMs).toISOString().split('T')[0];
+
+    const raw = await fmpRequest('historical-price-eod-light', {
+      symbol: ticker,
+      from: fromDate,
+      to: toDate,
+    });
+
+    // FMP "stable" returns flat array. Defensive: also handle { historical: [...] }
+    let entries;
+    if (Array.isArray(raw)) {
+      entries = raw;
+    } else if (raw && Array.isArray(raw.historical)) {
+      entries = raw.historical;
+    } else {
+      return [];
+    }
+
+    return entries.map(normalizeHistoricalPrice).filter(Boolean);
   },
 
   getTTL(endpoint) {
