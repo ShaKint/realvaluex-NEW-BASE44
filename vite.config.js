@@ -2,9 +2,23 @@ import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 import path from 'node:path';
 
-// https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    {
+      name: 'spa-fallback-preview',
+      configurePreviewServer(server) {
+        server.middlewares.use((req, res, next) => {
+          if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+          const url = req.url || '/';
+          if (url.startsWith('/assets/') || url.startsWith('/favicon')) return next();
+          if (/\.[a-zA-Z0-9]+$/.test(url.split('?')[0])) return next();
+          req.url = '/';
+          next();
+        });
+      },
+    },
+  ],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
@@ -17,13 +31,11 @@ export default defineConfig({
   preview: {
     port: process.env.PORT ? Number(process.env.PORT) : 4173,
     host: '0.0.0.0',
-    // Railway sends requests with the public host header; allow it explicitly:
     allowedHosts: ['.up.railway.app', '.railway.app', 'localhost'],
   },
   build: {
     outDir: 'dist',
     sourcemap: false,
-    // Increase chunk size warning since we bundle a lot of Radix UI
     chunkSizeWarningLimit: 1000,
   },
 });
