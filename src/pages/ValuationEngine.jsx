@@ -1,8 +1,4 @@
-**להחליף: `src/pages/ValuationEngine.jsx`**
 
-נתיב: https://github.com/ShaKint/realvaluex-NEW-BASE44/blob/main/src/pages/ValuationEngine.jsx
-
-תוכן:
 
 ```jsx
 import { useState } from 'react';
