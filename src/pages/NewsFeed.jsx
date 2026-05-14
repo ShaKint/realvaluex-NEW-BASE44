@@ -1,4 +1,3 @@
-jsx
 import { useState, useEffect } from 'react';
 import { useLang } from '@/lib/LanguageContext';
 import { useAuth } from '@/lib/AuthContext';
@@ -80,7 +79,6 @@ export default function NewsFeed() {
   return (
     <DashboardLayout>
       <div className="p-4 sm:p-6 space-y-6 max-w-4xl mx-auto">
-        {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
@@ -88,47 +86,30 @@ export default function NewsFeed() {
             </div>
             <div>
               <h1 className="text-xl font-bold text-white">{lang === 'he' ? 'פיד חדשות' : 'Market News'}</h1>
-              <p className="text-white/35 text-xs">
-                {lang === 'he' ? 'חדשות מותאמות לפרופיל שלך' : 'Personalized to your profile'}
-              </p>
+              <p className="text-white/35 text-xs">{lang === 'he' ? 'חדשות מותאמות לפרופיל שלך' : 'Personalized to your profile'}</p>
             </div>
           </div>
-          <button
-            onClick={() => fetchNews(profile)}
-            disabled={loading}
-            className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/60 hover:text-white text-sm transition-all"
-          >
+          <button onClick={() => fetchNews(profile)} disabled={loading} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/60 hover:text-white text-sm transition-all">
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             <span className="hidden sm:block">{lang === 'he' ? 'רענן' : 'Refresh'}</span>
           </button>
         </div>
 
-        {/* Profile tag */}
         {profile && (
           <div className="flex items-center gap-2 text-xs text-white/25">
             <Zap className="w-3.5 h-3.5 text-violet-400" />
-            <span>
-              {lang === 'he'
-                ? `מותאם לפרופיל: ${profile.preferred_sectors?.slice(0, 3).join(', ') || 'כללי'}`
-                : `Personalized for: ${profile.preferred_sectors?.slice(0, 3).join(', ') || 'General'}`}
-            </span>
+            <span>{lang === 'he' ? `מותאם לפרופיל: ${profile.preferred_sectors?.slice(0, 3).join(', ') || 'כללי'}` : `Personalized for: ${profile.preferred_sectors?.slice(0, 3).join(', ') || 'General'}`}</span>
           </div>
         )}
 
-        {/* Category Filter */}
         <div className="flex flex-wrap gap-2">
           {CATEGORIES[lang].map(cat => (
-            <button
-              key={cat.key}
-              onClick={() => setCategory(cat.key)}
-              className={`px-3 py-1.5 rounded-xl border text-sm transition-all ${category === cat.key ? 'bg-violet-600 border-violet-500 text-white' : 'bg-white/5 border-white/10 text-white/40 hover:text-white hover:border-white/25'}`}
-            >
+            <button key={cat.key} onClick={() => setCategory(cat.key)} className={`px-3 py-1.5 rounded-xl border text-sm transition-all ${category === cat.key ? 'bg-violet-600 border-violet-500 text-white' : 'bg-white/5 border-white/10 text-white/40 hover:text-white hover:border-white/25'}`}>
               {cat.label}
             </button>
           ))}
         </div>
 
-        {/* Loading */}
         {loading && (
           <div className="text-center py-16">
             <div className="relative w-12 h-12 mx-auto mb-4">
@@ -140,10 +121,8 @@ export default function NewsFeed() {
           </div>
         )}
 
-        {/* News Grid */}
         {!loading && filtered.length > 0 && (
           <div className="space-y-3">
-            {/* Featured */}
             {filtered[0] && (
               <div className={`p-5 rounded-2xl border ${IMPACT_COLORS[filtered[0].impact] || 'bg-white/5 border-white/5'} relative`}>
                 <div className="flex items-start justify-between gap-3">
@@ -155,17 +134,11 @@ export default function NewsFeed() {
                       <span className="text-xs text-white/30">{filtered[0].source}</span>
                       <span className="text-xs text-white/20">{filtered[0].time_ago}</span>
                     </div>
-                    <h2 className="font-bold text-white text-base leading-snug mb-2">
-                      {lang === 'he' && filtered[0].headline_he ? filtered[0].headline_he : filtered[0].headline}
-                    </h2>
-                    <p className="text-white/45 text-sm leading-relaxed">
-                      {lang === 'he' && filtered[0].summary_he ? filtered[0].summary_he : filtered[0].summary}
-                    </p>
+                    <h2 className="font-bold text-white text-base leading-snug mb-2">{lang === 'he' && filtered[0].headline_he ? filtered[0].headline_he : filtered[0].headline}</h2>
+                    <p className="text-white/45 text-sm leading-relaxed">{lang === 'he' && filtered[0].summary_he ? filtered[0].summary_he : filtered[0].summary}</p>
                     {filtered[0].tickers?.length > 0 && (
                       <div className="flex gap-1.5 mt-3 flex-wrap">
-                        {filtered[0].tickers.map(t => (
-                          <span key={t} className="px-2 py-0.5 rounded-lg bg-white/10 text-white/60 text-xs font-mono">{t}</span>
-                        ))}
+                        {filtered[0].tickers.map(t => <span key={t} className="px-2 py-0.5 rounded-lg bg-white/10 text-white/60 text-xs font-mono">{t}</span>)}
                       </div>
                     )}
                   </div>
@@ -176,7 +149,6 @@ export default function NewsFeed() {
               </div>
             )}
 
-            {/* Rest */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {filtered.slice(1).map((item, i) => (
                 <div key={i} className="p-4 rounded-2xl bg-white/5 border border-white/5 hover:border-white/10 transition-all">
@@ -189,19 +161,13 @@ export default function NewsFeed() {
                       <Bookmark className="w-3.5 h-3.5" fill={saved.includes(item.id) ? 'currentColor' : 'none'} />
                     </button>
                   </div>
-                  <div className="font-semibold text-white text-sm leading-snug mb-1">
-                    {lang === 'he' && item.headline_he ? item.headline_he : item.headline}
-                  </div>
-                  <div className="text-white/35 text-xs leading-relaxed line-clamp-2">
-                    {lang === 'he' && item.summary_he ? item.summary_he : item.summary}
-                  </div>
+                  <div className="font-semibold text-white text-sm leading-snug mb-1">{lang === 'he' && item.headline_he ? item.headline_he : item.headline}</div>
+                  <div className="text-white/35 text-xs leading-relaxed line-clamp-2">{lang === 'he' && item.summary_he ? item.summary_he : item.summary}</div>
                   <div className="flex items-center justify-between mt-3">
                     <div className="text-white/20 text-xs">{item.source} · {item.time_ago}</div>
                     {item.tickers?.length > 0 && (
                       <div className="flex gap-1">
-                        {item.tickers.slice(0, 2).map(t => (
-                          <span key={t} className="px-1.5 py-0.5 rounded bg-white/5 text-white/40 text-xs font-mono">{t}</span>
-                        ))}
+                        {item.tickers.slice(0, 2).map(t => <span key={t} className="px-1.5 py-0.5 rounded bg-white/5 text-white/40 text-xs font-mono">{t}</span>)}
                       </div>
                     )}
                   </div>
@@ -212,12 +178,9 @@ export default function NewsFeed() {
         )}
 
         {!loading && filtered.length === 0 && news.length > 0 && (
-          <div className="text-center py-12 text-white/30 text-sm">
-            {lang === 'he' ? 'אין חדשות בקטגוריה זו' : 'No news in this category'}
-          </div>
+          <div className="text-center py-12 text-white/30 text-sm">{lang === 'he' ? 'אין חדשות בקטגוריה זו' : 'No news in this category'}</div>
         )}
       </div>
     </DashboardLayout>
   );
 }
-```
