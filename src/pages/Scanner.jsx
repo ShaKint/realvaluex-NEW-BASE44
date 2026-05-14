@@ -1,8 +1,4 @@
-**להחליף: `src/pages/Scanner.jsx`**
 
-נתיב: https://github.com/ShaKint/realvaluex-NEW-BASE44/blob/main/src/pages/Scanner.jsx
-
-תוכן:
 
 ```jsx
 import { useState } from 'react';
