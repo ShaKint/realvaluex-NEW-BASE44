@@ -2,16 +2,19 @@
  * @file Claude Client - wrapper around Anthropic SDK
  * @description Centralized API for calling Claude models with retry, JSON parsing, and usage tracking.
  *
+ * Note: temperature parameter is NOT supported by Claude Opus 4.7 (reasoning model).
+ * Output determinism is controlled by the model itself.
+ *
  * Models used per layer (per RealValueX brief):
  *   - Layer analysis: claude-opus-4-7 (deepest reasoning)
- *   - Scanner (3C-future): claude-sonnet-4-6
+ *   - Scanner: claude-sonnet-4-6
  *   - News snippets: claude-haiku-4-5-20251001
  */
 
 import Anthropic from '@anthropic-ai/sdk';
 
 // ============================================================================
-// Singleton client (reuses ANTHROPIC_API_KEY from env, same as index.js)
+// Singleton client (reuses ANTHROPIC_API_KEY from env)
 // ============================================================================
 let _client = null;
 function getClient() {
@@ -33,7 +36,7 @@ export const MODELS = {
   HAIKU: 'claude-haiku-4-5-20251001',
 };
 
-const DEFAULT_TIMEOUT_MS = 120000; // 2 minutes - Opus is slow on complex reasoning
+const DEFAULT_TIMEOUT_MS = 120000;
 const MAX_RETRIES = 2;
 
 /**
@@ -51,14 +54,8 @@ export class ClaudeError extends Error {
 
 /**
  * Extract JSON object from text that may contain surrounding markdown/text.
- * Handles common cases:
- *   - Pure JSON (returns as-is)
- *   - JSON inside ```json ... ``` fence
- *   - JSON with leading/trailing text
- *
  * @param {string} text
  * @returns {Object} parsed JSON
- * @throws {Error} if no valid JSON found
  */
 export function extractJson(text) {
   if (!text || typeof text !== 'string') {
@@ -93,13 +90,13 @@ export function extractJson(text) {
 
 /**
  * Call Claude with a system + user prompt, expecting JSON output.
+ * Note: temperature is NOT sent (deprecated for Opus 4.7).
  *
  * @param {Object} opts
- * @param {string} opts.model - one of MODELS.*
- * @param {string} opts.system - system prompt
- * @param {string} opts.userMessage - user message content
+ * @param {string} opts.model
+ * @param {string} opts.system
+ * @param {string} opts.userMessage
  * @param {number} [opts.maxTokens=4096]
- * @param {number} [opts.temperature=0.3] - lower = more deterministic (good for analysis)
  * @param {number} [opts.timeoutMs=DEFAULT_TIMEOUT_MS]
  * @returns {Promise<{json: Object, usage: {input_tokens: number, output_tokens: number}, raw_text: string}>}
  */
@@ -108,7 +105,6 @@ export async function callClaudeForJson({
   system,
   userMessage,
   maxTokens = 4096,
-  temperature = 0.3,
   timeoutMs = DEFAULT_TIMEOUT_MS,
 }) {
   if (!model || !system || !userMessage) {
@@ -124,14 +120,12 @@ export async function callClaudeForJson({
         {
           model,
           max_tokens: maxTokens,
-          temperature,
           system,
           messages: [{ role: 'user', content: userMessage }],
         },
         { timeout: timeoutMs }
       );
 
-      // Extract text content
       const textBlocks = response.content.filter(b => b.type === 'text');
       const rawText = textBlocks.map(b => b.text).join('\n');
 
@@ -139,7 +133,6 @@ export async function callClaudeForJson({
         throw new ClaudeError('Empty response from Claude', { raw: response });
       }
 
-      // Parse JSON
       let json;
       try {
         json = extractJson(rawText);
@@ -160,12 +153,11 @@ export async function callClaudeForJson({
     } catch (err) {
       lastError = err;
 
-      // Determine if retryable
       const statusCode = err.status || err.statusCode;
       const isRetryable =
-        statusCode === 429 ||  // rate limit
-        statusCode === 503 ||  // service unavailable
-        statusCode === 529 ||  // overloaded
+        statusCode === 429 ||
+        statusCode === 503 ||
+        statusCode === 529 ||
         err.name === 'AbortError';
 
       if (!isRetryable || attempt === MAX_RETRIES) {
@@ -176,7 +168,6 @@ export async function callClaudeForJson({
         });
       }
 
-      // Exponential backoff: 1s, 2s
       const delay = 1000 * Math.pow(2, attempt);
       console.warn(`[claude-client] Retry ${attempt + 1}/${MAX_RETRIES} after ${delay}ms due to:`, err.message);
       await new Promise(r => setTimeout(r, delay));
@@ -187,14 +178,13 @@ export async function callClaudeForJson({
 }
 
 /**
- * Simple text-only call (no JSON parsing). For future use.
+ * Simple text-only call (no JSON parsing).
  */
 export async function callClaudeForText({
   model,
   system,
   userMessage,
   maxTokens = 2048,
-  temperature = 0.5,
   timeoutMs = DEFAULT_TIMEOUT_MS,
 }) {
   const client = getClient();
@@ -202,7 +192,6 @@ export async function callClaudeForText({
     {
       model,
       max_tokens: maxTokens,
-      temperature,
       system,
       messages: [{ role: 'user', content: userMessage }],
     },
