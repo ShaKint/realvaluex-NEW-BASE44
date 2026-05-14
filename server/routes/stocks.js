@@ -5,24 +5,19 @@
  * Mounted at: /api/stocks/*
  *
  * Endpoints:
+ *   GET  /api/stocks/smoke-test?ticker=AAPL
  *   GET  /api/stocks/:ticker/profile
  *   GET  /api/stocks/:ticker/quote
  *   GET  /api/stocks/:ticker/key-metrics
  *   GET  /api/stocks/:ticker/earnings?limit=24
  *   GET  /api/stocks/:ticker/price-target
- *   GET  /api/stocks/smoke-test?ticker=AAPL    (admin smoke test)
- *
- * All endpoints require JWT auth (uses existing requireAuth middleware).
  */
 
-const express = require('express');
-const stockData = require('../services/stock-data');
+import express from 'express';
+import * as stockData from '../services/stock-data.js';
 
 const router = express.Router();
 
-// ============================================================================
-// Error handler helper
-// ============================================================================
 function handleError(res, err) {
   console.error('[stocks route] error:', err.message, err.stack);
   if (err.name === 'ProviderError') {
@@ -38,10 +33,6 @@ function handleError(res, err) {
     message: err.message,
   });
 }
-
-// ============================================================================
-// Routes
-// ============================================================================
 
 router.get('/smoke-test', async (req, res) => {
   try {
@@ -104,4 +95,4 @@ router.get('/:ticker/price-target', async (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;
