@@ -1,10 +1,3 @@
-**להחליף: `src/components/dashboard/MarketNews.jsx`**
-
-נתיב: https://github.com/ShaKint/realvaluex-NEW-BASE44/blob/main/src/components/dashboard/MarketNews.jsx
-
-תוכן:
-
-```jsx
 import { useState } from 'react';
 import { useLang } from '@/lib/LanguageContext';
 import { fetchMarketNews } from '@/lib/api-client';
@@ -52,9 +45,7 @@ export default function MarketNews() {
               {i < news.length - 1 && <div className="w-px h-6 bg-white/10" />}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-white/80 text-sm leading-snug group-hover:text-white transition-colors">
-                {lang === 'he' ? item.title_he : item.title_en}
-              </div>
+              <div className="text-white/80 text-sm leading-snug group-hover:text-white transition-colors">{lang === 'he' ? item.title_he : item.title_en}</div>
               <div className="flex items-center gap-2 mt-1">
                 <span className="text-white/25 text-xs">{item.time}</span>
                 <span className="text-white/20 text-xs">·</span>
@@ -66,15 +57,10 @@ export default function MarketNews() {
         ))}
       </div>
 
-      <button
-        onClick={loadMore}
-        disabled={loading}
-        className="mt-4 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-white/10 text-white/40 hover:text-white hover:border-white/20 hover:bg-white/5 transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-      >
+      <button onClick={loadMore} disabled={loading} className="mt-4 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-white/10 text-white/40 hover:text-white hover:border-white/20 hover:bg-white/5 transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed">
         <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
         {loading ? (lang === 'he' ? 'טוען...' : 'Loading...') : (lang === 'he' ? 'טען עוד חדשות' : 'Load more news')}
       </button>
     </div>
   );
 }
-```
