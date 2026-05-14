@@ -1,5 +1,4 @@
-
-```jsx
+jsx
 // src/pages/Onboarding.jsx
 // CHANGES vs Base44:
 //   - base44.entities.UserProfile.create() → supabase.from('user_profiles').upsert()
