@@ -4,24 +4,16 @@
  * Handles: cache lookup, provider call, cache write.
  *
  * Architecture: Cache stores NORMALIZED data (not raw provider responses).
- * Why: simpler than raw+normalize-on-read, and we already version the
- *      methodology in stocks_analysis_cache. If normalization changes, run
- *      cleanup_expired_cache() to wipe stale entries.
  *
  * Routes should ONLY use this module, not call providers directly.
- *
- * Example usage:
- *   const stockData = require('./services/stock-data');
- *   const profile = await stockData.getProfile('NVDA');
- *   const earnings = await stockData.getEarningsHistory('NVDA', 24);
  */
 
-const { createClient } = require('@supabase/supabase-js');
-const { getProvider } = require('./data-providers');
-const { ProviderError } = require('./data-providers/interface');
+import { createClient } from '@supabase/supabase-js';
+import { getProvider } from './data-providers/index.js';
+import { ProviderError } from './data-providers/interface.js';
 
 // ============================================================================
-// Supabase client (service_role - bypasses RLS, can read/write external_data_cache)
+// Supabase client (service_role - bypasses RLS)
 // ============================================================================
 let _supabase = null;
 function getSupabase() {
@@ -70,7 +62,6 @@ async function readCache(cacheKey) {
     }
     if (!data) return null;
 
-    // Fire-and-forget hit count increment
     incrementHitCount(cacheKey).catch(err =>
       console.warn(`[stock-data] hit count increment failed:`, err.message)
     );
@@ -110,7 +101,6 @@ async function writeCache(cacheKey, provider, endpoint, symbol, normalizedData, 
 }
 
 async function incrementHitCount(cacheKey) {
-  // Read-modify-write (not atomic, but acceptable for hit counts)
   const { data } = await getSupabase()
     .from('external_data_cache')
     .select('hit_count')
@@ -129,13 +119,6 @@ async function incrementHitCount(cacheKey) {
 // ============================================================================
 // Generic fetch-with-cache wrapper
 // ============================================================================
-/**
- * @param {string} endpoint - provider endpoint name
- * @param {string} ticker
- * @param {Object|null} extraParams - extra params affecting cache key (e.g. {limit: 24})
- * @param {() => Promise<any>} fetchFn - returns NORMALIZED data
- * @returns {Promise<any>} normalized data (from cache or fresh)
- */
 async function fetchWithCache(endpoint, ticker, extraParams, fetchFn) {
   if (!ticker || typeof ticker !== 'string') {
     throw new Error('Ticker is required and must be a string');
@@ -144,16 +127,13 @@ async function fetchWithCache(endpoint, ticker, extraParams, fetchFn) {
   const provider = getProvider();
   const cacheKey = buildCacheKey(provider.name, endpoint, tickerUpper, extraParams);
 
-  // 1. Try cache
   const cached = await readCache(cacheKey);
   if (cached !== null) {
     return cached;
   }
 
-  // 2. Cache miss - fetch from provider (returns normalized data)
   const normalized = await fetchFn();
 
-  // 3. Fire-and-forget cache write
   const ttl = provider.getTTL(endpoint);
   writeCache(cacheKey, provider.name, endpoint, tickerUpper, normalized, ttl, extraParams)
     .catch(err => console.warn(`[stock-data] background cache write failed:`, err.message));
@@ -165,7 +145,7 @@ async function fetchWithCache(endpoint, ticker, extraParams, fetchFn) {
 // Public API
 // ============================================================================
 
-async function getProfile(ticker) {
+export async function getProfile(ticker) {
   return await fetchWithCache(
     'profile',
     ticker,
@@ -174,7 +154,7 @@ async function getProfile(ticker) {
   );
 }
 
-async function getQuote(ticker) {
+export async function getQuote(ticker) {
   return await fetchWithCache(
     'quote',
     ticker,
@@ -183,7 +163,7 @@ async function getQuote(ticker) {
   );
 }
 
-async function getKeyMetricsTTM(ticker) {
+export async function getKeyMetricsTTM(ticker) {
   return await fetchWithCache(
     'key-metrics-ttm',
     ticker,
@@ -192,7 +172,7 @@ async function getKeyMetricsTTM(ticker) {
   );
 }
 
-async function getEarningsHistory(ticker, limit = 24) {
+export async function getEarningsHistory(ticker, limit = 24) {
   return await fetchWithCache(
     'earnings',
     ticker,
@@ -201,7 +181,7 @@ async function getEarningsHistory(ticker, limit = 24) {
   );
 }
 
-async function getPriceTargetConsensus(ticker) {
+export async function getPriceTargetConsensus(ticker) {
   return await fetchWithCache(
     'price-target-consensus',
     ticker,
@@ -212,12 +192,8 @@ async function getPriceTargetConsensus(ticker) {
 
 /**
  * Manually invalidate cache for a ticker.
- * Use after: earnings event, price target change, manual data refresh.
- * @param {string} ticker
- * @param {string} [endpoint] - if omitted, invalidates ALL endpoints for ticker
- * @returns {Promise<number>} number of cache entries deleted
  */
-async function invalidateCache(ticker, endpoint) {
+export async function invalidateCache(ticker, endpoint) {
   const supabase = getSupabase();
   let query = supabase
     .from('external_data_cache')
@@ -230,11 +206,9 @@ async function invalidateCache(ticker, endpoint) {
 }
 
 /**
- * Smoke test - call from a route or admin script to verify everything works end-to-end.
- * @param {string} [ticker='AAPL']
- * @returns {Promise<Object>} test results
+ * Smoke test - verify the data layer works end-to-end.
  */
-async function smokeTest(ticker = 'AAPL') {
+export async function smokeTest(ticker = 'AAPL') {
   const results = {};
   const tests = [
     ['profile', () => getProfile(ticker)],
@@ -266,13 +240,4 @@ async function smokeTest(ticker = 'AAPL') {
   return results;
 }
 
-module.exports = {
-  getProfile,
-  getQuote,
-  getKeyMetricsTTM,
-  getEarningsHistory,
-  getPriceTargetConsensus,
-  invalidateCache,
-  smokeTest,
-  ProviderError,
-};
+export { ProviderError };
