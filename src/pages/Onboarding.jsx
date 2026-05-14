@@ -1,8 +1,3 @@
-**להחליף: `src/pages/Onboarding.jsx`**
-
-נתיב: https://github.com/ShaKint/realvaluex-NEW-BASE44/blob/main/src/pages/Onboarding.jsx
-
-תוכן:
 
 ```jsx
 // src/pages/Onboarding.jsx
