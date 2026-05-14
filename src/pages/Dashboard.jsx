@@ -1,8 +1,3 @@
-**להחליף: `src/pages/Dashboard.jsx`**
-
-נתיב: https://github.com/ShaKint/realvaluex-NEW-BASE44/blob/main/src/pages/Dashboard.jsx
-
-תוכן:
 
 ```jsx
 import { useEffect, useState } from 'react';
