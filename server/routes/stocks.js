@@ -1,13 +1,19 @@
 /**
  * @file Stock Data routes - thin wrapper around the stock-data Facade
- * @description Endpoints for testing the data layer and serving raw stock data.
+ * @description Endpoints for serving stock data via cached FMP calls.
  *
  * Mounted at: /api/stocks/*
+ *
+ * Endpoints:
+ *   GET  /api/stocks/smoke-test?ticker=AAPL
+ *   GET  /api/stocks/:ticker/profile
+ *   GET  /api/stocks/:ticker/quote
+ *   GET  /api/stocks/:ticker/key-metrics
+ *   GET  /api/stocks/:ticker/earnings?limit=24
+ *   GET  /api/stocks/:ticker/price-target
  */
 
 import express from 'express';
-import { createClient } from '@supabase/supabase-js';
-import WebSocket from 'ws';
 import * as stockData from '../services/stock-data.js';
 
 const router = express.Router();
@@ -27,112 +33,6 @@ function handleError(res, err) {
     message: err.message,
   });
 }
-
-// ============================================================================
-// DIAGNOSTIC ENDPOINT - temporary, for debugging cache write issues
-// ============================================================================
-router.get('/cache-debug', async (req, res) => {
-  const diagnostics = {
-    env_check: {},
-    supabase_init: null,
-    insert_test: null,
-    select_test: null,
-  };
-
-  // Step 1: Check env vars exist
-  diagnostics.env_check.SUPABASE_URL_present = !!process.env.SUPABASE_URL;
-  diagnostics.env_check.SUPABASE_URL_value = process.env.SUPABASE_URL ? process.env.SUPABASE_URL.substring(0, 30) + '...' : null;
-  diagnostics.env_check.SUPABASE_SERVICE_ROLE_KEY_present = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
-  diagnostics.env_check.SUPABASE_SERVICE_ROLE_KEY_length = process.env.SUPABASE_SERVICE_ROLE_KEY?.length || 0;
-  // Show key prefix (first 15 chars) to identify type
-  diagnostics.env_check.SUPABASE_SERVICE_ROLE_KEY_prefix = process.env.SUPABASE_SERVICE_ROLE_KEY?.substring(0, 15) || null;
-  // Try JWT decode
-  try {
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-    const parts = key.split('.');
-    if (parts.length === 3) {
-      const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
-      diagnostics.env_check.key_role = payload.role || 'unknown';
-    } else {
-      diagnostics.env_check.key_role = 'not-a-jwt';
-    }
-  } catch (e) {
-    diagnostics.env_check.key_role_decode_error = e.message;
-  }
-
-  // Step 2: Initialize Supabase client WITH WebSocket transport (Node 20 requirement)
-  let supabase;
-  try {
-    supabase = createClient(
-      process.env.SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY,
-      {
-        auth: { persistSession: false, autoRefreshToken: false },
-        realtime: { transport: WebSocket },
-      }
-    );
-    diagnostics.supabase_init = 'ok';
-  } catch (err) {
-    diagnostics.supabase_init = `error: ${err.message}`;
-    return res.json(diagnostics);
-  }
-
-  // Step 3: Try an INSERT
-  try {
-    const testKey = `diagnostic:test:${Date.now()}`;
-    const { data, error } = await supabase
-      .from('external_data_cache')
-      .insert({
-        cache_key: testKey,
-        provider: 'fmp',
-        endpoint: 'debug',
-        symbol: 'DEBUG',
-        data: { diagnostic: true, ts: Date.now() },
-        expires_at: new Date(Date.now() + 60000).toISOString(),
-      })
-      .select();
-
-    if (error) {
-      diagnostics.insert_test = {
-        ok: false,
-        error_message: error.message,
-        error_code: error.code,
-        error_details: error.details,
-        error_hint: error.hint,
-      };
-    } else {
-      diagnostics.insert_test = {
-        ok: true,
-        rows_inserted: data?.length || 0,
-        inserted_key: testKey,
-      };
-    }
-  } catch (err) {
-    diagnostics.insert_test = { ok: false, exception: err.message };
-  }
-
-  // Step 4: SELECT to verify
-  try {
-    const { data, error } = await supabase
-      .from('external_data_cache')
-      .select('cache_key, symbol, fetched_at')
-      .order('fetched_at', { ascending: false })
-      .limit(5);
-    if (error) {
-      diagnostics.select_test = { ok: false, error_message: error.message };
-    } else {
-      diagnostics.select_test = { ok: true, rows: data || [] };
-    }
-  } catch (err) {
-    diagnostics.select_test = { ok: false, exception: err.message };
-  }
-
-  res.json(diagnostics);
-});
-
-// ============================================================================
-// Regular routes
-// ============================================================================
 
 router.get('/smoke-test', async (req, res) => {
   try {
