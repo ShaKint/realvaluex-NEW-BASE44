@@ -1,7 +1,3 @@
-// src/lib/AuthContext.jsx
-// Auth context using Supabase Auth (Email/Password + Google OAuth)
-// Replaces the Base44 version which used app-public-settings + base44.auth
-
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -14,22 +10,17 @@ export const AuthProvider = ({ children }) => {
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [authError, setAuthError] = useState(null);
 
-  // Kept for backwards compatibility with App.jsx loading state
   const isLoadingPublicSettings = false;
 
   useEffect(() => {
-    // 1. On mount, get the current session
     supabase.auth.getSession().then(({ data: { session: s }, error }) => {
-      if (error) {
-        setAuthError({ type: 'unknown', message: error.message });
-      }
+      if (error) setAuthError({ type: 'unknown', message: error.message });
       setSession(s);
       setUser(s?.user ?? null);
       setIsAuthenticated(!!s?.user);
       setIsLoadingAuth(false);
     });
 
-    // 2. Subscribe to auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, s) => {
         setSession(s);
@@ -41,8 +32,6 @@ export const AuthProvider = ({ children }) => {
 
     return () => subscription?.unsubscribe();
   }, []);
-
-  // ── Auth actions ───────────────────────────────────────────────────────
 
   const signInWithEmail = async (email, password) => {
     setAuthError(null);
@@ -82,31 +71,17 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
     setSession(null);
     setIsAuthenticated(false);
-    if (shouldRedirect) {
-      window.location.href = '/';
-    }
+    if (shouldRedirect) window.location.href = '/';
   };
 
   const navigateToLogin = () => {
-    // Simple redirect to a login page. If you build a /login route,
-    // adjust this. For now, send to root which has the Welcome screen.
-    window.location.href = '/';
+    window.location.href = '/login';
   };
 
   return (
     <AuthContext.Provider value={{
-      user,
-      session,
-      isAuthenticated,
-      isLoadingAuth,
-      isLoadingPublicSettings,
-      authError,
-      // actions
-      signInWithEmail,
-      signUpWithEmail,
-      signInWithGoogle,
-      logout,
-      navigateToLogin,
+      user, session, isAuthenticated, isLoadingAuth, isLoadingPublicSettings, authError,
+      signInWithEmail, signUpWithEmail, signInWithGoogle, logout, navigateToLogin,
     }}>
       {children}
     </AuthContext.Provider>
