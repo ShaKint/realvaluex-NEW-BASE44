@@ -1,5 +1,3 @@
-// server/routes/scanner.js
-
 import { Router } from 'express';
 import { anthropic } from '../index.js';
 
@@ -40,15 +38,18 @@ const SCAN_SCHEMA = {
 };
 
 router.post('/', async (req, res) => {
+  const startTime = Date.now();
   try {
     const { filters = {}, lang = 'en' } = req.body || {};
+    console.log('[scanner] request received:', { filters, lang });
+
     const hebrewBlock = lang === 'he'
       ? ' IMPORTANT: Write ALL text fields (one_liner_he, rationale_he, strategy_fit, earnings_track, tam_growth, analyst_consensus, key_catalysts, key_risks) in Hebrew. Numbers and tickers remain in English.'
       : '';
 
     const prompt = `You are a stock screener AI for the RealValueX platform.${hebrewBlock}
 
-Generate a realistic list of 12 stocks matching these filters:
+Generate a realistic list of 8 stocks matching these filters:
 - Sector: ${filters.sector === 'all' ? 'any sector' : filters.sector}
 - Strategy: ${filters.strategy || 'any'}
 - Market Cap: ${filters.marketCap}
@@ -66,6 +67,8 @@ For each stock, provide a detailed rationale explaining WHY it matches the strat
 - Specific catalysts that could unlock value
 - Notable risks to the thesis`;
 
+    console.log('[scanner] calling Anthropic API...');
+
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 8000,
@@ -78,11 +81,23 @@ For each stock, provide a detailed rationale explaining WHY it matches the strat
       messages: [{ role: 'user', content: prompt }],
     });
 
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+    console.log(`[scanner] Anthropic responded in ${elapsed}s, stop_reason:`, response.stop_reason);
+    console.log('[scanner] content blocks:', response.content.map(b => b.type));
+
     const toolUse = response.content.find(b => b.type === 'tool_use');
-    res.json(toolUse?.input ?? { stocks: [] });
+    if (!toolUse) {
+      console.error('[scanner] NO tool_use block! Full response:', JSON.stringify(response.content));
+      return res.json({ stocks: [], debug: 'no tool_use in response' });
+    }
+
+    const stockCount = toolUse.input?.stocks?.length || 0;
+    console.log(`[scanner] returning ${stockCount} stocks`);
+    res.json(toolUse.input ?? { stocks: [] });
   } catch (error) {
-    console.error('[scanner] error:', error);
-    res.status(500).json({ error: error.message });
+    console.error('[scanner] ERROR:', error.message);
+    console.error('[scanner] stack:', error.stack);
+    res.status(500).json({ error: error.message, stocks: [] });
   }
 });
 
