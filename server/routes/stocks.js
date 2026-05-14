@@ -7,6 +7,7 @@
 
 import express from 'express';
 import { createClient } from '@supabase/supabase-js';
+import WebSocket from 'ws';
 import * as stockData from '../services/stock-data.js';
 
 const router = express.Router();
@@ -43,14 +44,15 @@ router.get('/cache-debug', async (req, res) => {
   diagnostics.env_check.SUPABASE_URL_value = process.env.SUPABASE_URL ? process.env.SUPABASE_URL.substring(0, 30) + '...' : null;
   diagnostics.env_check.SUPABASE_SERVICE_ROLE_KEY_present = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
   diagnostics.env_check.SUPABASE_SERVICE_ROLE_KEY_length = process.env.SUPABASE_SERVICE_ROLE_KEY?.length || 0;
-  // Decode JWT role from key (first part of JWT, base64-decoded)
+  // Show key prefix (first 15 chars) to identify type
+  diagnostics.env_check.SUPABASE_SERVICE_ROLE_KEY_prefix = process.env.SUPABASE_SERVICE_ROLE_KEY?.substring(0, 15) || null;
+  // Try JWT decode
   try {
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
     const parts = key.split('.');
     if (parts.length === 3) {
       const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
       diagnostics.env_check.key_role = payload.role || 'unknown';
-      diagnostics.env_check.key_iss = payload.iss || 'unknown';
     } else {
       diagnostics.env_check.key_role = 'not-a-jwt';
     }
@@ -58,13 +60,16 @@ router.get('/cache-debug', async (req, res) => {
     diagnostics.env_check.key_role_decode_error = e.message;
   }
 
-  // Step 2: Initialize Supabase client
+  // Step 2: Initialize Supabase client WITH WebSocket transport (Node 20 requirement)
   let supabase;
   try {
     supabase = createClient(
       process.env.SUPABASE_URL,
       process.env.SUPABASE_SERVICE_ROLE_KEY,
-      { auth: { persistSession: false, autoRefreshToken: false } }
+      {
+        auth: { persistSession: false, autoRefreshToken: false },
+        realtime: { transport: WebSocket },
+      }
     );
     diagnostics.supabase_init = 'ok';
   } catch (err) {
