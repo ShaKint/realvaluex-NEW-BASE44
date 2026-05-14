@@ -3,18 +3,12 @@
  * @description Centralized API for calling Claude models with retry, JSON parsing, and usage tracking.
  *
  * Note: temperature parameter is NOT supported by Claude Opus 4.7 (reasoning model).
- * Output determinism is controlled by the model itself.
- *
- * Models used per layer (per RealValueX brief):
- *   - Layer analysis: claude-opus-4-7 (deepest reasoning)
- *   - Scanner: claude-sonnet-4-6
- *   - News snippets: claude-haiku-4-5-20251001
  */
 
 import Anthropic from '@anthropic-ai/sdk';
 
 // ============================================================================
-// Singleton client (reuses ANTHROPIC_API_KEY from env)
+// Singleton client
 // ============================================================================
 let _client = null;
 function getClient() {
@@ -36,7 +30,7 @@ export const MODELS = {
   HAIKU: 'claude-haiku-4-5-20251001',
 };
 
-const DEFAULT_TIMEOUT_MS = 120000;
+const DEFAULT_TIMEOUT_MS = 180000;  // 3 minutes for complex layers
 const MAX_RETRIES = 2;
 
 /**
@@ -53,52 +47,140 @@ export class ClaudeError extends Error {
 }
 
 /**
- * Extract JSON object from text that may contain surrounding markdown/text.
+ * Robust JSON extraction with multiple fallback strategies.
+ * Handles:
+ *   - Pure JSON
+ *   - ```json ... ``` fence (with or without language)
+ *   - JSON with leading commentary
+ *   - JSON with trailing commentary
+ *   - Truncated JSON (attempts to repair common cases)
+ *
  * @param {string} text
- * @returns {Object} parsed JSON
+ * @returns {Object}
+ * @throws {Error} with diagnostic info
  */
 export function extractJson(text) {
   if (!text || typeof text !== 'string') {
     throw new Error('Cannot extract JSON from empty/non-string input');
   }
 
-  // Try 1: parse as-is
+  const trimmed = text.trim();
+
+  // Strategy 1: parse as-is
   try {
-    return JSON.parse(text.trim());
-  } catch (_) { /* fall through */ }
+    return JSON.parse(trimmed);
+  } catch (_) { /* continue */ }
 
-  // Try 2: extract from ```json ... ``` fence
-  const fenceMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
+  // Strategy 2: extract from ```json ... ``` or ``` ... ``` fence
+  const fenceMatch = trimmed.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
   if (fenceMatch) {
-    try {
-      return JSON.parse(fenceMatch[1].trim());
-    } catch (_) { /* fall through */ }
-  }
-
-  // Try 3: find first { and matching last }
-  const firstBrace = text.indexOf('{');
-  const lastBrace = text.lastIndexOf('}');
-  if (firstBrace !== -1 && lastBrace > firstBrace) {
-    const candidate = text.substring(firstBrace, lastBrace + 1);
+    const candidate = fenceMatch[1].trim();
     try {
       return JSON.parse(candidate);
-    } catch (_) { /* fall through */ }
+    } catch (_) { /* continue */ }
   }
 
-  throw new Error(`Could not extract valid JSON from response (length: ${text.length})`);
+  // Strategy 3: find longest substring that starts with { and ends with }
+  const firstBrace = trimmed.indexOf('{');
+  const lastBrace = trimmed.lastIndexOf('}');
+  if (firstBrace !== -1 && lastBrace > firstBrace) {
+    const candidate = trimmed.substring(firstBrace, lastBrace + 1);
+    try {
+      return JSON.parse(candidate);
+    } catch (_) { /* continue */ }
+
+    // Strategy 4: attempt to repair common truncation
+    // Add missing closing braces/brackets
+    const repaired = tryRepairTruncated(candidate);
+    if (repaired) {
+      try {
+        return JSON.parse(repaired);
+      } catch (_) { /* continue */ }
+    }
+  }
+
+  // All strategies failed - throw with diagnostic info
+  const preview = trimmed.length > 500
+    ? trimmed.substring(0, 250) + '...[truncated]...' + trimmed.substring(trimmed.length - 250)
+    : trimmed;
+  throw new Error(
+    `Could not extract valid JSON from response (length: ${text.length}). Preview: ${preview}`
+  );
+}
+
+/**
+ * Attempt to repair JSON that was cut off mid-output.
+ * Adds missing closing brackets/braces.
+ */
+function tryRepairTruncated(text) {
+  let openBraces = 0;
+  let openBrackets = 0;
+  let inString = false;
+  let escapeNext = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (escapeNext) { escapeNext = false; continue; }
+    if (ch === '\\') { escapeNext = true; continue; }
+    if (ch === '"' && !escapeNext) { inString = !inString; continue; }
+    if (inString) continue;
+    if (ch === '{') openBraces++;
+    else if (ch === '}') openBraces--;
+    else if (ch === '[') openBrackets++;
+    else if (ch === ']') openBrackets--;
+  }
+
+  if (openBraces <= 0 && openBrackets <= 0) return null; // nothing to fix
+
+  // Find last comma or open structure; truncate after it cleanly
+  let repaired = text;
+  // Remove trailing partial line (after last , or { or [ or ")
+  const lastValid = Math.max(
+    repaired.lastIndexOf(','),
+    repaired.lastIndexOf('"'),
+    repaired.lastIndexOf('}'),
+    repaired.lastIndexOf(']')
+  );
+  if (lastValid > 0) {
+    repaired = repaired.substring(0, lastValid + 1);
+    // Remove trailing comma if present (invalid in JSON)
+    if (repaired.endsWith(',')) repaired = repaired.slice(0, -1);
+  }
+
+  // Recount after truncation
+  openBraces = 0;
+  openBrackets = 0;
+  inString = false;
+  escapeNext = false;
+  for (let i = 0; i < repaired.length; i++) {
+    const ch = repaired[i];
+    if (escapeNext) { escapeNext = false; continue; }
+    if (ch === '\\') { escapeNext = true; continue; }
+    if (ch === '"' && !escapeNext) { inString = !inString; continue; }
+    if (inString) continue;
+    if (ch === '{') openBraces++;
+    else if (ch === '}') openBraces--;
+    else if (ch === '[') openBrackets++;
+    else if (ch === ']') openBrackets--;
+  }
+
+  // Close any open structures
+  while (openBrackets > 0) { repaired += ']'; openBrackets--; }
+  while (openBraces > 0) { repaired += '}'; openBraces--; }
+
+  return repaired;
 }
 
 /**
  * Call Claude with a system + user prompt, expecting JSON output.
- * Note: temperature is NOT sent (deprecated for Opus 4.7).
  *
  * @param {Object} opts
  * @param {string} opts.model
  * @param {string} opts.system
  * @param {string} opts.userMessage
  * @param {number} [opts.maxTokens=4096]
- * @param {number} [opts.timeoutMs=DEFAULT_TIMEOUT_MS]
- * @returns {Promise<{json: Object, usage: {input_tokens: number, output_tokens: number}, raw_text: string}>}
+ * @param {number} [opts.timeoutMs]
+ * @param {string} [opts.layerName] - for diagnostic logging
  */
 export async function callClaudeForJson({
   model,
@@ -106,6 +188,7 @@ export async function callClaudeForJson({
   userMessage,
   maxTokens = 4096,
   timeoutMs = DEFAULT_TIMEOUT_MS,
+  layerName = 'unknown',
 }) {
   if (!model || !system || !userMessage) {
     throw new ClaudeError('callClaudeForJson requires model, system, and userMessage');
@@ -133,12 +216,23 @@ export async function callClaudeForJson({
         throw new ClaudeError('Empty response from Claude', { raw: response });
       }
 
+      // Check stop reason - if max_tokens, log warning
+      if (response.stop_reason === 'max_tokens') {
+        console.warn(`[claude-client/${layerName}] Response hit max_tokens (${maxTokens}). Output may be truncated.`);
+      }
+
       let json;
       try {
         json = extractJson(rawText);
       } catch (parseErr) {
-        throw new ClaudeError(`JSON parse failed: ${parseErr.message}`, {
-          raw: rawText.substring(0, 500),
+        // Log diagnostic info before failing
+        console.error(`[claude-client/${layerName}] JSON parse failed`);
+        console.error(`[claude-client/${layerName}] stop_reason: ${response.stop_reason}`);
+        console.error(`[claude-client/${layerName}] tokens: in=${response.usage?.input_tokens} out=${response.usage?.output_tokens}`);
+        console.error(`[claude-client/${layerName}] response length: ${rawText.length}`);
+        console.error(`[claude-client/${layerName}] response end: ...${rawText.substring(Math.max(0, rawText.length - 300))}`);
+        throw new ClaudeError(`JSON parse failed for ${layerName}: ${parseErr.message}`, {
+          raw: rawText.substring(0, 1000),
         });
       }
 
@@ -149,6 +243,7 @@ export async function callClaudeForJson({
           output_tokens: response.usage?.output_tokens || 0,
         },
         raw_text: rawText,
+        stop_reason: response.stop_reason,
       };
     } catch (err) {
       lastError = err;
@@ -169,7 +264,7 @@ export async function callClaudeForJson({
       }
 
       const delay = 1000 * Math.pow(2, attempt);
-      console.warn(`[claude-client] Retry ${attempt + 1}/${MAX_RETRIES} after ${delay}ms due to:`, err.message);
+      console.warn(`[claude-client/${layerName}] Retry ${attempt + 1}/${MAX_RETRIES} after ${delay}ms:`, err.message);
       await new Promise(r => setTimeout(r, delay));
     }
   }
