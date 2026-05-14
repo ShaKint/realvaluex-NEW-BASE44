@@ -1,8 +1,4 @@
-**להחליף: `src/pages/Alerts.jsx`**
 
-נתיב: https://github.com/ShaKint/realvaluex-NEW-BASE44/blob/main/src/pages/Alerts.jsx
-
-תוכן:
 
 ```jsx
 // src/pages/Alerts.jsx
