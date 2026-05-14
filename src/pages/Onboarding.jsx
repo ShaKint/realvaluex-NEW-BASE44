@@ -1,10 +1,3 @@
-jsx
-// src/pages/Onboarding.jsx
-// CHANGES vs Base44:
-//   - base44.entities.UserProfile.create() → supabase.from('user_profiles').upsert()
-//   - base44.auth.redirectToLogin() → navigateToLogin from AuthContext
-//   - user_id now uses user.id (UUID) instead of user.email
-
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLang } from '@/lib/LanguageContext';
@@ -46,7 +39,6 @@ export default function Onboarding() {
   const handleFinish = async () => {
     if (!user) return;
     setSaving(true);
-    // Upsert by user_id (which is UNIQUE) so re-running onboarding overwrites
     const { error } = await supabase
       .from('user_profiles')
       .upsert({
@@ -95,10 +87,7 @@ export default function Onboarding() {
           <div className="text-white/60 text-sm mb-4">
             {lang === 'he' ? 'יש להתחבר כדי להמשיך' : 'Please log in to continue'}
           </div>
-          <button
-            onClick={navigateToLogin}
-            className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-semibold transition-all"
-          >
+          <button onClick={navigateToLogin} className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-semibold transition-all">
             {lang === 'he' ? 'התחברות' : 'Log In'}
           </button>
         </div>
@@ -108,13 +97,11 @@ export default function Onboarding() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 flex flex-col">
-      {/* Header */}
       <div className="flex items-center justify-between p-4 sm:p-6">
-        <div className="text-white font-bold text-lg tracking-tight">RealValueX™</div>
+        <div className="text-white font-bold text-lg tracking-tight">RealValueX</div>
         <LanguageSwitcher />
       </div>
 
-      {/* Progress */}
       <div className="px-4 sm:px-8 mb-6">
         <div className="max-w-md mx-auto">
           <div className="flex justify-between text-white/40 text-xs mb-2">
@@ -122,15 +109,11 @@ export default function Onboarding() {
             <span>{Math.round((step / TOTAL_STEPS) * 100)}%</span>
           </div>
           <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-indigo-500 to-violet-500 rounded-full transition-all duration-500"
-              style={{ width: `${(step / TOTAL_STEPS) * 100}%` }}
-            />
+            <div className="h-full bg-gradient-to-r from-indigo-500 to-violet-500 rounded-full transition-all duration-500" style={{ width: `${(step / TOTAL_STEPS) * 100}%` }} />
           </div>
         </div>
       </div>
 
-      {/* Content */}
       <div className="flex-1 flex items-start justify-center px-4 sm:px-8">
         <div className="w-full max-w-md">
           <div className="mb-8">
@@ -146,34 +129,22 @@ export default function Onboarding() {
         </div>
       </div>
 
-      {/* Navigation */}
       <div className="p-4 sm:p-8">
         <div className="max-w-md mx-auto flex items-center justify-between gap-4">
           {step > 1 ? (
-            <button
-              onClick={() => setStep(s => s - 1)}
-              className="flex items-center gap-2 text-white/60 hover:text-white transition-colors"
-            >
+            <button onClick={() => setStep(s => s - 1)} className="flex items-center gap-2 text-white/60 hover:text-white transition-colors">
               <BackIcon className="w-4 h-4" />
               <span>{t(lang, 'back')}</span>
             </button>
           ) : <div />}
 
           {step < TOTAL_STEPS ? (
-            <button
-              onClick={() => setStep(s => s + 1)}
-              disabled={!canProceed()}
-              className="flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-30 disabled:cursor-not-allowed text-white rounded-xl font-semibold transition-all"
-            >
+            <button onClick={() => setStep(s => s + 1)} disabled={!canProceed()} className="flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-30 disabled:cursor-not-allowed text-white rounded-xl font-semibold transition-all">
               <span>{t(lang, 'next')}</span>
               <NextIcon className="w-4 h-4" />
             </button>
           ) : (
-            <button
-              onClick={handleFinish}
-              disabled={saving}
-              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 disabled:opacity-50 text-white rounded-xl font-semibold transition-all"
-            >
+            <button onClick={handleFinish} disabled={saving} className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 disabled:opacity-50 text-white rounded-xl font-semibold transition-all">
               <CheckCircle2 className="w-5 h-5" />
               <span>{saving ? t(lang, 'loading') : t(lang, 'finish')}</span>
             </button>
@@ -183,4 +154,3 @@ export default function Onboarding() {
     </div>
   );
 }
-```
