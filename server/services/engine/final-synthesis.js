@@ -1,8 +1,3 @@
-/**
- * @file Final Synthesis Engine
- * @description Synthesizes all prior outputs - Overall Score + Investment Score + Recommendation
- */
-
 import { callClaudeForJson, MODELS } from './claude-client.js';
 
 const SYSTEM_PROMPT = `אתה RealValueX Final Synthesizer.
@@ -68,12 +63,25 @@ function computeInvestmentScore({ overallScore, speedScore, rucScore }) {
   );
 
   let tier, description;
-  if (score >= 85) { tier = 'Exceptional'; description = 'יוצא מן הכלל - איכות + טיימינג + פוטנציאל מיושרים'; }
-  else if (score >= 70) { tier = 'Excellent'; description = 'מצוין - הזדמנות אטרקטיבית'; }
-  else if (score >= 55) { tier = 'Good'; description = 'טוב - שווה שיקול עם זהירות בכניסה'; }
-  else if (score >= 40) { tier = 'Mixed'; description = 'מעורב - יתרונות וחסרונות מאוזנים'; }
-  else if (score >= 25) { tier = 'Weak'; description = 'חלש - איכות סבירה אבל טיימינג בעייתי'; }
-  else { tier = 'Poor'; description = 'נמוך - להתרחק כרגע'; }
+  if (score >= 85) {
+    tier = 'Exceptional';
+    description = 'יוצא מן הכלל - איכות + טיימינג + פוטנציאל מיושרים';
+  } else if (score >= 70) {
+    tier = 'Excellent';
+    description = 'מצוין - הזדמנות אטרקטיבית';
+  } else if (score >= 55) {
+    tier = 'Good';
+    description = 'טוב - שווה שיקול עם זהירות בכניסה';
+  } else if (score >= 40) {
+    tier = 'Mixed';
+    description = 'מעורב - יתרונות וחסרונות מאוזנים';
+  } else if (score >= 25) {
+    tier = 'Weak';
+    description = 'חלש - איכות סבירה אבל טיימינג בעייתי';
+  } else {
+    tier = 'Poor';
+    description = 'נמוך - להתרחק כרגע';
+  }
 
   return {
     score,
@@ -178,4 +186,3 @@ export async function runFinalSynthesis({ ticker, profile, stockData, layer1, la
     usage,
   };
 }
-===END===
