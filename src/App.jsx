@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import { LanguageProvider } from '@/lib/LanguageContext';
 
 import Welcome from '@/pages/Welcome';
+import Login from '@/pages/Login';
 import Onboarding from '@/pages/Onboarding';
 import Dashboard from '@/pages/Dashboard';
 import ValuationEngine from '@/pages/ValuationEngine';
@@ -26,6 +27,7 @@ const AuthenticatedApp = () => {
   return (
     <Routes>
       <Route path="/" element={<Welcome />} />
+      <Route path="/login" element={<Login />} />
       <Route path="/onboarding" element={<Onboarding />} />
       <Route path="/dashboard" element={<Dashboard />} />
       <Route path="/valuation" element={<ValuationEngine />} />
