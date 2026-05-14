@@ -1,4 +1,3 @@
-jsx
 import { useState } from 'react';
 import { useLang } from '@/lib/LanguageContext';
 import { runValuation } from '@/lib/api-client';
@@ -32,7 +31,6 @@ export default function ValuationEngine() {
   return (
     <DashboardLayout>
       <div className="p-4 sm:p-8 max-w-3xl mx-auto w-full">
-        {/* Header */}
         <div className="mb-6 flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center">
             <Brain className="w-5 h-5 text-white" />
@@ -59,13 +57,9 @@ export default function ValuationEngine() {
           </div>
         )}
 
-        {error && (
-          <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-sm">{error}</div>
-        )}
-
+        {error && <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-sm">{error}</div>}
         {result && !loading && <ValuationResult ticker={ticker} result={result} />}
       </div>
     </DashboardLayout>
   );
 }
-```
