@@ -6,13 +6,6 @@
  *
  * Key inputs: All previous layer outputs + Beat Ratio + Technical Indicators
  *
- * CRITICAL: Layer 4 produces the "ongoing rules" for the position:
- *   - What's the Thesis Statement that defines this trade?
- *   - When do we add to the position (Pyramid Up)?
- *   - When do we reduce (Trim Down)?
- *   - When do we exit completely (Thesis Break)?
- *   - What news/events should trigger a review?
- *
  * Output: Hebrew JSON with Thesis Lock + Monitoring rules.
  */
 
@@ -26,7 +19,7 @@ const SYSTEM_PROMPT = `אתה RealValueX™ Layer 4 - Monitoring Engine.
 
 1. **Thesis Statement היא הלב של Layer 4.** משפט יחיד שמתאר מה אנחנו מאמינים שיקרה.
    דוגמה (לא לחזור עליה, רק להמחיש): "אנחנו מאמינים ש-DemandShock של AI על NAND יימשך 24+ חודשים,
-   המחירים יישארו גבוהים, וההכנסות יחצו $30B עד 2027."
+   המחירים יישארו גבוהים, וההכנסות יחצו 30B עד 2027."
 
    כל כלל נוסף נגזר מה-Thesis. אם ה-Thesis נשבר → exit.
 
@@ -74,13 +67,18 @@ const SYSTEM_PROMPT = `אתה RealValueX™ Layer 4 - Monitoring Engine.
 - פרק 31: Review Schedule
 - פרק 35: Position Lifecycle`;
 
-const OUTPUT_SCHEMA = `{
+/**
+ * Build the JSON schema string for the user message.
+ * Takes profile as a parameter to inject into the rationale field.
+ */
+function buildOutputSchema(profile) {
+  return `{
   "thesis_statement": "<משפט יחיד בעברית - מה אנחנו מאמינים שיקרה>",
   "thesis_confidence": <0-100>,
 
   "position_sizing": {
     "recommended_pct_of_portfolio": <אחוז מהתיק, 0.5-15>,
-    "rationale": "<בעברית - למה הגודל הזה לפרופיל ${profile_placeholder}>",
+    "rationale": "<בעברית - למה הגודל הזה לפרופיל ${profile}>",
     "max_pct_after_pyramid": <אחוז מקסימלי, גדול או שווה לרמת הבסיס>
   },
 
@@ -130,6 +128,7 @@ const OUTPUT_SCHEMA = `{
   "positive_indicators": ["<בעברית>"],
   "negative_indicators": ["<בעברית>"]
 }`;
+}
 
 function buildUserMessage({ ticker, profile, stockData, beatRatio, technicalIndicators, layer1Output, layer2Output, layer3Output }) {
   const layer1Context = {
@@ -153,6 +152,8 @@ function buildUserMessage({ ticker, profile, stockData, beatRatio, technicalIndi
     risk_levels: layer3Output.risk_levels,
     timing_summary: layer3Output.timing_summary,
   };
+
+  const outputSchema = buildOutputSchema(profile);
 
   return `נתח את המניה הבאה לפי Layer 4 (Monitoring Engine):
 
@@ -241,7 +242,7 @@ ${JSON.stringify({
 
 החזר אך ורק JSON שתואם בדיוק לסכימה:
 \`\`\`
-${OUTPUT_SCHEMA.replace('${profile_placeholder}', profile)}
+${outputSchema}
 \`\`\`
 
 JSON בלבד. ללא הקדמה. ללא markdown fence.`;
