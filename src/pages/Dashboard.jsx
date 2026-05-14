@@ -1,4 +1,3 @@
-jsx
 import { useEffect, useState } from 'react';
 import { useLang } from '@/lib/LanguageContext';
 import { useAuth } from '@/lib/AuthContext';
@@ -30,7 +29,6 @@ export default function Dashboard() {
   return (
     <DashboardLayout>
       <div className="flex-1 p-4 sm:p-6 space-y-5">
-        {/* Welcome */}
         <div className="p-5 rounded-2xl bg-gradient-to-r from-indigo-900/40 to-violet-900/40 border border-indigo-500/20 flex items-center justify-between gap-4">
           <div>
             <h2 className="text-xl font-bold text-white">
@@ -45,10 +43,7 @@ export default function Dashboard() {
             </p>
           </div>
           {!profile && (
-            
-              href="/onboarding"
-              className="flex-shrink-0 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-xl transition-all"
-            >
+            <a href="/onboarding" className="flex-shrink-0 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-xl transition-all">
               {lang === 'he' ? 'השלם פרופיל' : 'Complete Profile'}
             </a>
           )}
@@ -67,4 +62,3 @@ export default function Dashboard() {
     </DashboardLayout>
   );
 }
-```
