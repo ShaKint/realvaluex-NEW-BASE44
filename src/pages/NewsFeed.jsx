@@ -1,6 +1,4 @@
-
-
-```jsx
+jsx
 import { useState, useEffect } from 'react';
 import { useLang } from '@/lib/LanguageContext';
 import { useAuth } from '@/lib/AuthContext';
