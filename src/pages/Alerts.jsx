@@ -1,8 +1,3 @@
-jsx
-// src/pages/Alerts.jsx
-// FULL REWRITE: base44.entities.Alert → supabase.from('alerts')
-// base44.auth.me() → useAuth() context
-
 import { useState, useEffect } from 'react';
 import { useLang } from '@/lib/LanguageContext';
 import { useAuth } from '@/lib/AuthContext';
@@ -132,7 +127,6 @@ export default function Alerts() {
   return (
     <DashboardLayout>
       <div className="p-4 sm:p-6 space-y-6 max-w-3xl mx-auto">
-        {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
@@ -143,88 +137,35 @@ export default function Alerts() {
               <p className="text-white/35 text-xs">{lang === 'he' ? 'התראות מחיר ואירועים' : 'Price & event alerts'}</p>
             </div>
           </div>
-          <button
-            onClick={() => setShowForm(s => !s)}
-            className="flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-sm transition-all"
-          >
+          <button onClick={() => setShowForm(s => !s)} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-sm transition-all">
             <Plus className="w-4 h-4" />
             <span>{lang === 'he' ? 'חדש' : 'New'}</span>
           </button>
         </div>
 
-        {/* Form */}
         {showForm && (
           <div className="p-5 rounded-2xl bg-white/5 border border-white/5 space-y-4">
-            <input
-              type="text"
-              value={form.ticker}
-              onChange={e => setForm(f => ({ ...f, ticker: e.target.value.toUpperCase() }))}
-              placeholder={lang === 'he' ? 'סמל מניה (AAPL)' : 'Ticker (AAPL)'}
-              className="w-full bg-slate-800 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-amber-500 font-mono"
-            />
-            <select
-              value={form.alert_type}
-              onChange={e => setForm(f => ({ ...f, alert_type: e.target.value }))}
-              className="w-full bg-slate-800 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-amber-500"
-            >
+            <input type="text" value={form.ticker} onChange={e => setForm(f => ({ ...f, ticker: e.target.value.toUpperCase() }))} placeholder={lang === 'he' ? 'סמל מניה (AAPL)' : 'Ticker (AAPL)'} className="w-full bg-slate-800 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-amber-500 font-mono" />
+            <select value={form.alert_type} onChange={e => setForm(f => ({ ...f, alert_type: e.target.value }))} className="w-full bg-slate-800 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-amber-500">
               {ALERT_TYPES[lang].map(t => <option key={t.key} value={t.key}>{t.label}</option>)}
             </select>
             {needsValue(form.alert_type) && (
-              <input
-                type="number"
-                value={form.target_value}
-                onChange={e => setForm(f => ({ ...f, target_value: e.target.value }))}
-                placeholder={lang === 'he' ? 'ערך יעד' : 'Target value'}
-                className="w-full bg-slate-800 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-amber-500"
-              />
+              <input type="number" value={form.target_value} onChange={e => setForm(f => ({ ...f, target_value: e.target.value }))} placeholder={lang === 'he' ? 'ערך יעד' : 'Target value'} className="w-full bg-slate-800 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-amber-500" />
             )}
-            <input
-              type="text"
-              value={form.notes}
-              onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
-              placeholder={lang === 'he' ? 'הערות (אופציונלי)' : 'Notes (optional)'}
-              className="w-full bg-slate-800 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-amber-500"
-            />
-            <button
-              onClick={addAlert}
-              disabled={saving || !form.ticker}
-              className="w-full py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-semibold transition-all text-sm"
-            >
+            <input type="text" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder={lang === 'he' ? 'הערות (אופציונלי)' : 'Notes (optional)'} className="w-full bg-slate-800 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-amber-500" />
+            <button onClick={addAlert} disabled={saving || !form.ticker} className="w-full py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-semibold transition-all text-sm">
               {saving ? (lang === 'he' ? 'שומר...' : 'Saving...') : (lang === 'he' ? 'צור התראה' : 'Create Alert')}
             </button>
           </div>
         )}
 
         {loading && <div className="text-center py-12 text-white/40">{lang === 'he' ? 'טוען...' : 'Loading...'}</div>}
+        {!loading && alerts.length === 0 && <div className="text-center py-12 text-white/30 text-sm">{lang === 'he' ? 'אין התראות עדיין. צור התראה ראשונה!' : 'No alerts yet. Create your first alert!'}</div>}
 
-        {!loading && alerts.length === 0 && (
-          <div className="text-center py-12 text-white/30 text-sm">
-            {lang === 'he' ? 'אין התראות עדיין. צור התראה ראשונה!' : 'No alerts yet. Create your first alert!'}
-          </div>
-        )}
-
-        {triggeredAlerts.length > 0 && (
-          <div>
-            <h3 className="text-amber-400 text-xs uppercase tracking-widest mb-3">{lang === 'he' ? `הופעלו (${triggeredAlerts.length})` : `Triggered (${triggeredAlerts.length})`}</h3>
-            <div className="space-y-2">{triggeredAlerts.map(a => <AlertCard key={a.id} alert={a} />)}</div>
-          </div>
-        )}
-
-        {activeAlerts.length > 0 && (
-          <div>
-            <h3 className="text-white/40 text-xs uppercase tracking-widest mb-3">{lang === 'he' ? `פעילות (${activeAlerts.length})` : `Active (${activeAlerts.length})`}</h3>
-            <div className="space-y-2">{activeAlerts.map(a => <AlertCard key={a.id} alert={a} />)}</div>
-          </div>
-        )}
-
-        {inactiveAlerts.length > 0 && (
-          <div>
-            <h3 className="text-white/25 text-xs uppercase tracking-widest mb-3">{lang === 'he' ? `כבויות (${inactiveAlerts.length})` : `Inactive (${inactiveAlerts.length})`}</h3>
-            <div className="space-y-2">{inactiveAlerts.map(a => <AlertCard key={a.id} alert={a} />)}</div>
-          </div>
-        )}
+        {triggeredAlerts.length > 0 && <div><h3 className="text-amber-400 text-xs uppercase tracking-widest mb-3">{lang === 'he' ? `הופעלו (${triggeredAlerts.length})` : `Triggered (${triggeredAlerts.length})`}</h3><div className="space-y-2">{triggeredAlerts.map(a => <AlertCard key={a.id} alert={a} />)}</div></div>}
+        {activeAlerts.length > 0 && <div><h3 className="text-white/40 text-xs uppercase tracking-widest mb-3">{lang === 'he' ? `פעילות (${activeAlerts.length})` : `Active (${activeAlerts.length})`}</h3><div className="space-y-2">{activeAlerts.map(a => <AlertCard key={a.id} alert={a} />)}</div></div>}
+        {inactiveAlerts.length > 0 && <div><h3 className="text-white/25 text-xs uppercase tracking-widest mb-3">{lang === 'he' ? `כבויות (${inactiveAlerts.length})` : `Inactive (${inactiveAlerts.length})`}</h3><div className="space-y-2">{inactiveAlerts.map(a => <AlertCard key={a.id} alert={a} />)}</div></div>}
       </div>
     </DashboardLayout>
   );
 }
-```
