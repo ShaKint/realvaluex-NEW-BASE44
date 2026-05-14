@@ -1,24 +1,20 @@
 /**
  * @file FMP Data Provider
  * @description Implementation of DataProvider interface for Financial Modeling Prep.
- * Uses the "stable" API (financialmodelingprep.com/stable/...).
- * Falls back to v3 legacy if stable endpoint returns 404.
- *
- * Requires environment variable: FMP_API_KEY
+ * Uses the "stable" API. Requires env variable: FMP_API_KEY
  */
 
-const { ProviderError, classifyMarketCap } = require('./interface');
+import { ProviderError, classifyMarketCap } from './interface.js';
 
 const FMP_BASE_URL = 'https://financialmodelingprep.com';
-const FMP_API_VERSION = 'stable'; // change to 'api/v3' if needed
+const FMP_API_VERSION = 'stable';
 const REQUEST_TIMEOUT_MS = 15000;
 
 /**
  * Make a request to FMP API.
- * @param {string} endpoint - e.g. 'profile', 'quote', 'key-metrics-ttm'
- * @param {Object} params - query parameters (apikey added automatically)
+ * @param {string} endpoint
+ * @param {Object} params
  * @returns {Promise<any>}
- * @throws {ProviderError}
  */
 async function fmpRequest(endpoint, params = {}) {
   const apiKey = process.env.FMP_API_KEY;
@@ -52,7 +48,6 @@ async function fmpRequest(endpoint, params = {}) {
 
     const data = await response.json();
 
-    // FMP returns {"Error Message": "..."} for some errors with 200 status
     if (data && typeof data === 'object' && data['Error Message']) {
       throw new ProviderError(
         `FMP ${endpoint}: ${data['Error Message']}`,
@@ -80,9 +75,6 @@ async function fmpRequest(endpoint, params = {}) {
   }
 }
 
-/**
- * FMP often returns single-item endpoints as arrays. Unwrap them.
- */
 function unwrapSingle(data) {
   if (Array.isArray(data)) return data[0] || null;
   return data;
@@ -193,18 +185,18 @@ function normalizePriceTarget(raw) {
 // TTL Policy (seconds)
 // ============================================================================
 const TTL_POLICY = {
-  'profile': 7 * 24 * 60 * 60,           // 7 days
-  'quote': 5 * 60,                        // 5 minutes
-  'key-metrics-ttm': 24 * 60 * 60,        // 24 hours
-  'earnings': 24 * 60 * 60,               // 24 hours
-  'price-target-consensus': 24 * 60 * 60, // 24 hours
+  'profile': 7 * 24 * 60 * 60,
+  'quote': 5 * 60,
+  'key-metrics-ttm': 24 * 60 * 60,
+  'earnings': 24 * 60 * 60,
+  'price-target-consensus': 24 * 60 * 60,
 };
-const DEFAULT_TTL = 60 * 60; // 1 hour
+const DEFAULT_TTL = 60 * 60;
 
 // ============================================================================
 // Provider export
 // ============================================================================
-module.exports = {
+const fmpProvider = {
   name: 'fmp',
 
   async getProfile(ticker) {
@@ -236,13 +228,6 @@ module.exports = {
   getTTL(endpoint) {
     return TTL_POLICY[endpoint] || DEFAULT_TTL;
   },
-
-  // Exposed for cache layer to use raw response from cache
-  _normalize: {
-    profile: (raw) => normalizeProfile(unwrapSingle(raw)),
-    quote: (raw) => normalizeQuote(unwrapSingle(raw)),
-    'key-metrics-ttm': (raw) => normalizeKeyMetrics(unwrapSingle(raw)),
-    earnings: (raw) => Array.isArray(raw) ? raw.map(normalizeEarningsEntry) : [],
-    'price-target-consensus': (raw) => normalizePriceTarget(unwrapSingle(raw)),
-  },
 };
+
+export default fmpProvider;
