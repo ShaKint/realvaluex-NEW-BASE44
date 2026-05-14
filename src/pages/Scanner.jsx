@@ -1,6 +1,4 @@
-
-
-```jsx
+jsx
 import { useState } from 'react';
 import { useLang } from '@/lib/LanguageContext';
 import { ScanSearch, Filter, TrendingUp, TrendingDown, Minus, RefreshCw, ChevronDown, ChevronUp, BookOpen } from 'lucide-react';
