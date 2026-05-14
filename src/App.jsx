@@ -1,10 +1,3 @@
-**להחליף: `src/App.jsx`**
-
-נתיב: https://github.com/ShaKint/realvaluex-NEW-BASE44/blob/main/src/App.jsx
-
-תוכן:
-
-```jsx
 import { Toaster } from "@/components/ui/toaster";
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClientInstance } from '@/lib/query-client';
@@ -60,4 +53,3 @@ function App() {
 }
 
 export default App;
-```
