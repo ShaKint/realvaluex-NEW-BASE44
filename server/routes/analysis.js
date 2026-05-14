@@ -5,22 +5,22 @@
  * Mounted at: /api/analysis/*
  *
  * Endpoints:
- *   GET  /api/analysis/search             Search analyzed stocks by filters (deduplicated)
- *   GET  /api/analysis/list               List all analyzed stocks (deduplicated)
- *   GET  /api/analysis/:ticker/history    Historical analyses for a specific ticker
- *   GET  /api/analysis/:ticker            Run full 4-layer analysis (LLM, ~3-4 min)
+ *   GET  /api/analysis/search             Search analyzed stocks (deduplicated)
+ *   GET  /api/analysis/list               List all analyzed (deduplicated)
+ *   GET  /api/analysis/:ticker/chart      Price history + technical indicators (no LLM, fast)
+ *   GET  /api/analysis/:ticker/history    Historical analyses for a ticker
+ *   GET  /api/analysis/:ticker            Run full 4-layer analysis (LLM)
  */
 
 import express from 'express';
 import { createClient } from '@supabase/supabase-js';
 import WebSocket from 'ws';
 import { analyzeStock } from '../services/engine/orchestrator.js';
+import * as stockData from '../services/stock-data.js';
+import { computeTechnicalIndicators } from '../services/engine/technical-indicators.js';
 
 const router = express.Router();
 
-// ============================================================================
-// Supabase client (for read-only queries)
-// ============================================================================
 let _supabase = null;
 function getSupabase() {
   if (_supabase) return _supabase;
@@ -68,10 +68,6 @@ function handleError(res, err) {
   });
 }
 
-/**
- * Deduplicate analysis rows by ticker+profile, keeping the most recent.
- * Returns rows in their original order (which should be by created_at desc).
- */
 function dedupByTickerProfile(rows) {
   const seen = new Set();
   const unique = [];
@@ -86,7 +82,87 @@ function dedupByTickerProfile(rows) {
 }
 
 // ============================================================================
-// SEARCH endpoint - filtered, deduplicated, fast (DB-only)
+// CHART endpoint - price history + technical indicators (FAST, no LLM)
+// ============================================================================
+/**
+ * GET /api/analysis/:ticker/chart?days=90
+ *
+ * Returns historical price data + technical indicators.
+ * Uses FMP cache - typically returns in ~500ms.
+ *
+ * Response shape:
+ * {
+ *   ticker, current_price, year_high, year_low,
+ *   quote: { price, change, changePercentage, dayLow, dayHigh, volume, marketCap, ... },
+ *   historical: [{ date, close, volume }, ...],  // newest first
+ *   indicators: {
+ *     rsi: { value, zone, description },
+ *     moving_averages: { ma20, ma50, ma200, state, description },
+ *     distance: { from_year_high_pct, from_year_low_pct },
+ *     momentum: { ... },
+ *     volume: { ... },
+ *     structure: { pattern, description },
+ *     volatility: { annualized_pct },
+ *     summary
+ *   }
+ * }
+ */
+router.get('/:ticker/chart', async (req, res) => {
+  try {
+    const ticker = req.params.ticker?.toUpperCase();
+    const days = Math.min(parseInt(req.query.days) || 90, 365);
+
+    if (!ticker) {
+      return res.status(400).json({ error: 'Bad request', message: 'ticker is required' });
+    }
+
+    // Fetch in parallel (all cached)
+    const [quote, historical, profile] = await Promise.all([
+      stockData.getQuote(ticker),
+      stockData.getHistoricalPrices(ticker, days),
+      stockData.getProfile(ticker),
+    ]);
+
+    if (!quote && !historical?.length) {
+      return res.status(404).json({ error: 'Not found', ticker });
+    }
+
+    // Compute technical indicators
+    const indicators = computeTechnicalIndicators(historical || [], quote);
+
+    res.json({
+      ticker,
+      company_name: profile?.companyName || null,
+      sector: profile?.sector || null,
+      industry: profile?.industry || null,
+
+      current_price: quote?.price || null,
+      year_high: quote?.yearHigh || null,
+      year_low: quote?.yearLow || null,
+
+      quote: quote ? {
+        price: quote.price,
+        change: quote.change,
+        changePercentage: quote.changePercentage,
+        dayLow: quote.dayLow,
+        dayHigh: quote.dayHigh,
+        volume: quote.volume,
+        marketCap: quote.marketCap,
+        ma50: quote.ma50,
+        ma200: quote.ma200,
+        timestamp: quote.timestamp,
+      } : null,
+
+      historical: historical || [],
+      indicators,
+    });
+  } catch (err) {
+    handleError(res, err);
+  }
+});
+
+// ============================================================================
+// SEARCH endpoint
 // ============================================================================
 router.get('/search', async (req, res) => {
   try {
@@ -106,7 +182,6 @@ router.get('/search', async (req, res) => {
       include_expired = 'false',
     } = req.query;
 
-    // Validation
     if (!profile) {
       return res.status(400).json({
         error: 'Bad request',
@@ -121,12 +196,9 @@ router.get('/search', async (req, res) => {
     }
 
     const limit = Math.min(parseInt(req.query.limit) || 50, 200);
+    const fetchLimit = limit * 3;
 
     const supabase = getSupabase();
-
-    // Fetch more than limit so we have rows to deduplicate from
-    // (we may have multiple analyses per ticker+profile)
-    const fetchLimit = limit * 3;
 
     let query = supabase
       .from('stocks_analysis_cache')
@@ -154,40 +226,23 @@ router.get('/search', async (req, res) => {
       query = query.gt('expires_at', new Date().toISOString());
     }
 
-    // Score filters
-    if (min_score !== undefined) {
-      query = query.gte('quality_score', parseInt(min_score));
-    }
-    if (max_score !== undefined) {
-      query = query.lte('quality_score', parseInt(max_score));
-    }
-    if (min_confidence !== undefined) {
-      query = query.gte('confidence_score', parseInt(min_confidence));
-    }
-    if (min_speed !== undefined) {
-      query = query.gte('speed_score', parseInt(min_speed));
-    }
-    if (min_yield !== undefined) {
-      query = query.gte('yield_score', parseInt(min_yield));
-    }
-    if (min_duration !== undefined) {
-      query = query.gte('duration_score', parseInt(min_duration));
-    }
+    if (min_score !== undefined) query = query.gte('quality_score', parseInt(min_score));
+    if (max_score !== undefined) query = query.lte('quality_score', parseInt(max_score));
+    if (min_confidence !== undefined) query = query.gte('confidence_score', parseInt(min_confidence));
+    if (min_speed !== undefined) query = query.gte('speed_score', parseInt(min_speed));
+    if (min_yield !== undefined) query = query.gte('yield_score', parseInt(min_yield));
+    if (min_duration !== undefined) query = query.gte('duration_score', parseInt(min_duration));
 
-    // Categorical filters
     if (recommendation) {
       const recs = recommendation.split(',').map(s => s.trim());
       query = query.in('recommendation', recs);
     }
-    if (type) {
-      query = query.eq('type_classification', type);
-    }
+    if (type) query = query.eq('type_classification', type);
     if (backbone) {
       const tiers = backbone.split(',').map(s => s.trim());
       query = query.in('backbone_tier', tiers);
     }
 
-    // Always order by created_at desc FIRST so deduplication takes most recent
     query = query.order('created_at', { ascending: false });
     query = query.limit(fetchLimit);
 
@@ -200,7 +255,6 @@ router.get('/search', async (req, res) => {
 
     let results = data || [];
 
-    // Sector filter (post-query, since it's on joined table)
     if (sector) {
       const sectorLower = sector.toLowerCase();
       results = results.filter(r =>
@@ -208,10 +262,8 @@ router.get('/search', async (req, res) => {
       );
     }
 
-    // Deduplicate by ticker+profile (keep most recent)
     results = dedupByTickerProfile(results);
 
-    // Now sort by the requested column (after dedup)
     const sortColumn = {
       'overall_score': 'quality_score',
       'confidence': 'confidence_score',
@@ -226,16 +278,12 @@ router.get('/search', async (req, res) => {
       const bVal = b[sortColumn];
       if (aVal === null || aVal === undefined) return 1;
       if (bVal === null || bVal === undefined) return -1;
-      if (sortColumn === 'created_at') {
-        return new Date(bVal) - new Date(aVal);
-      }
+      if (sortColumn === 'created_at') return new Date(bVal) - new Date(aVal);
       return bVal - aVal;
     });
 
-    // Apply final limit after dedup
     results = results.slice(0, limit);
 
-    // Flatten for cleaner response
     const flattened = results.map(r => ({
       id: r.id,
       ticker: r.ticker,
@@ -243,18 +291,15 @@ router.get('/search', async (req, res) => {
       sector: r.stocks_master?.sector || null,
       industry: r.stocks_master?.industry || null,
       market_cap_class: r.stocks_master?.market_cap_class || null,
-
       overall_score: r.quality_score,
       recommendation: r.recommendation,
       backbone_tier: r.backbone_tier,
       type_classification: r.type_classification,
       s31_total: r.s31_total,
-
       yield_score: r.yield_score,
       speed_score: r.speed_score,
       duration_score: r.duration_score,
       confidence_score: r.confidence_score,
-
       analyzed_at: r.created_at,
       expires_at: r.expires_at,
       is_expired: new Date(r.expires_at) < new Date(),
@@ -263,17 +308,8 @@ router.get('/search', async (req, res) => {
     res.json({
       profile,
       filters_applied: {
-        min_score,
-        max_score,
-        recommendation,
-        type,
-        backbone,
-        min_confidence,
-        min_speed,
-        min_yield,
-        min_duration,
-        sector,
-        sort_by,
+        min_score, max_score, recommendation, type, backbone,
+        min_confidence, min_speed, min_yield, min_duration, sector, sort_by,
       },
       count: flattened.length,
       results: flattened,
@@ -284,7 +320,7 @@ router.get('/search', async (req, res) => {
 });
 
 // ============================================================================
-// LIST endpoint - simple deduplicated list for autocomplete/sidebar
+// LIST endpoint
 // ============================================================================
 router.get('/list', async (req, res) => {
   try {
@@ -300,12 +336,9 @@ router.get('/list', async (req, res) => {
       .order('created_at', { ascending: false })
       .limit(limit * 3);
 
-    if (profile) {
-      query = query.eq('best_profile_match', profile);
-    }
+    if (profile) query = query.eq('best_profile_match', profile);
 
     const { data, error } = await query;
-
     if (error) {
       return res.status(500).json({ error: 'List failed', message: error.message });
     }
@@ -323,14 +356,8 @@ router.get('/list', async (req, res) => {
 });
 
 // ============================================================================
-// HISTORY endpoint - all past analyses for a specific ticker
+// HISTORY endpoint
 // ============================================================================
-/**
- * GET /api/analysis/:ticker/history?profile=G1&limit=20
- *
- * Returns the full history of analyses for a ticker (optionally filtered by profile).
- * Useful for tracking how scores have evolved over time.
- */
 router.get('/:ticker/history', async (req, res) => {
   try {
     const ticker = req.params.ticker?.toUpperCase();
@@ -346,20 +373,10 @@ router.get('/:ticker/history', async (req, res) => {
     let query = supabase
       .from('stocks_analysis_cache')
       .select(`
-        id,
-        ticker,
-        best_profile_match,
-        quality_score,
-        recommendation,
-        backbone_tier,
-        type_classification,
-        s31_total,
-        yield_score,
-        speed_score,
-        duration_score,
-        confidence_score,
-        created_at,
-        expires_at
+        id, ticker, best_profile_match, quality_score, recommendation,
+        backbone_tier, type_classification, s31_total,
+        yield_score, speed_score, duration_score, confidence_score,
+        created_at, expires_at
       `)
       .eq('ticker', ticker)
       .eq('analysis_type', 'full_valuation')
@@ -415,11 +432,8 @@ router.get('/:ticker/history', async (req, res) => {
 });
 
 // ============================================================================
-// FULL ANALYSIS endpoint - the 4-layer pipeline
+// FULL ANALYSIS endpoint
 // ============================================================================
-/**
- * GET /api/analysis/:ticker?profile=G1&force_refresh=false
- */
 router.get('/:ticker', async (req, res) => {
   try {
     const ticker = req.params.ticker?.toUpperCase();
