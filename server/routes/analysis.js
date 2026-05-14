@@ -5,9 +5,10 @@
  * Mounted at: /api/analysis/*
  *
  * Endpoints:
- *   GET  /api/analysis/search       Search analyzed stocks by filters (fast, DB-only)
- *   GET  /api/analysis/list         List all analyzed stocks (paginated)
- *   GET  /api/analysis/:ticker      Run full 4-layer analysis (LLM, ~3-4 min)
+ *   GET  /api/analysis/search             Search analyzed stocks by filters (deduplicated)
+ *   GET  /api/analysis/list               List all analyzed stocks (deduplicated)
+ *   GET  /api/analysis/:ticker/history    Historical analyses for a specific ticker
+ *   GET  /api/analysis/:ticker            Run full 4-layer analysis (LLM, ~3-4 min)
  */
 
 import express from 'express';
@@ -18,7 +19,7 @@ import { analyzeStock } from '../services/engine/orchestrator.js';
 const router = express.Router();
 
 // ============================================================================
-// Supabase client (for read-only search queries)
+// Supabase client (for read-only queries)
 // ============================================================================
 let _supabase = null;
 function getSupabase() {
@@ -67,28 +68,26 @@ function handleError(res, err) {
   });
 }
 
-// ============================================================================
-// SEARCH endpoint - fast DB-only search of analyzed stocks
-// ============================================================================
 /**
- * GET /api/analysis/search?profile=G1&min_score=70&recommendation=Buy,Hold&type=B
- *
- * Filters (all optional except profile):
- *   - profile: C1|G1|M1|F1 (required)
- *   - min_score: 0-100 (quality_score >= X)
- *   - max_score: 0-100
- *   - recommendation: comma-separated list (Strong Buy,Buy,Hold,Trim,Sell)
- *   - type: A|B|C
- *   - backbone: comma-separated list (Pure,Near,In-Making,Niche,Aspiring,Commodity)
- *   - min_confidence: 0-100
- *   - min_speed: 0-100
- *   - min_yield: 0-100
- *   - min_duration: 0-100
- *   - sector: text match on stocks_master.sector
- *   - limit: default 50, max 200
- *   - sort_by: overall_score|confidence|speed|yield|duration (default: overall_score desc)
- *   - include_expired: true to include expired cache entries (default: false)
+ * Deduplicate analysis rows by ticker+profile, keeping the most recent.
+ * Returns rows in their original order (which should be by created_at desc).
  */
+function dedupByTickerProfile(rows) {
+  const seen = new Set();
+  const unique = [];
+  for (const row of rows) {
+    const key = `${row.ticker}:${row.best_profile_match || row.profile}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      unique.push(row);
+    }
+  }
+  return unique;
+}
+
+// ============================================================================
+// SEARCH endpoint - filtered, deduplicated, fast (DB-only)
+// ============================================================================
 router.get('/search', async (req, res) => {
   try {
     const {
@@ -124,6 +123,11 @@ router.get('/search', async (req, res) => {
     const limit = Math.min(parseInt(req.query.limit) || 50, 200);
 
     const supabase = getSupabase();
+
+    // Fetch more than limit so we have rows to deduplicate from
+    // (we may have multiple analyses per ticker+profile)
+    const fetchLimit = limit * 3;
+
     let query = supabase
       .from('stocks_analysis_cache')
       .select(`
@@ -146,7 +150,6 @@ router.get('/search', async (req, res) => {
       .eq('best_profile_match', profile)
       .eq('analysis_type', 'full_valuation');
 
-    // Date filter (not expired by default)
     if (include_expired !== 'true') {
       query = query.gt('expires_at', new Date().toISOString());
     }
@@ -184,7 +187,31 @@ router.get('/search', async (req, res) => {
       query = query.in('backbone_tier', tiers);
     }
 
-    // Sorting
+    // Always order by created_at desc FIRST so deduplication takes most recent
+    query = query.order('created_at', { ascending: false });
+    query = query.limit(fetchLimit);
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('[analysis/search] query error:', error);
+      return res.status(500).json({ error: 'Search failed', message: error.message });
+    }
+
+    let results = data || [];
+
+    // Sector filter (post-query, since it's on joined table)
+    if (sector) {
+      const sectorLower = sector.toLowerCase();
+      results = results.filter(r =>
+        r.stocks_master?.sector?.toLowerCase().includes(sectorLower)
+      );
+    }
+
+    // Deduplicate by ticker+profile (keep most recent)
+    results = dedupByTickerProfile(results);
+
+    // Now sort by the requested column (after dedup)
     const sortColumn = {
       'overall_score': 'quality_score',
       'confidence': 'confidence_score',
@@ -194,24 +221,19 @@ router.get('/search', async (req, res) => {
       'recent': 'created_at',
     }[sort_by] || 'quality_score';
 
-    query = query.order(sortColumn, { ascending: false, nullsLast: true });
-    query = query.limit(limit);
+    results.sort((a, b) => {
+      const aVal = a[sortColumn];
+      const bVal = b[sortColumn];
+      if (aVal === null || aVal === undefined) return 1;
+      if (bVal === null || bVal === undefined) return -1;
+      if (sortColumn === 'created_at') {
+        return new Date(bVal) - new Date(aVal);
+      }
+      return bVal - aVal;
+    });
 
-    const { data, error } = await query;
-
-    if (error) {
-      console.error('[analysis/search] query error:', error);
-      return res.status(500).json({ error: 'Search failed', message: error.message });
-    }
-
-    // Apply sector filter post-query (since it's on joined table)
-    let results = data || [];
-    if (sector) {
-      const sectorLower = sector.toLowerCase();
-      results = results.filter(r =>
-        r.stocks_master?.sector?.toLowerCase().includes(sectorLower)
-      );
-    }
+    // Apply final limit after dedup
+    results = results.slice(0, limit);
 
     // Flatten for cleaner response
     const flattened = results.map(r => ({
@@ -262,7 +284,7 @@ router.get('/search', async (req, res) => {
 });
 
 // ============================================================================
-// LIST endpoint - simple list of all analyzed tickers (for autocomplete/sidebar)
+// LIST endpoint - simple deduplicated list for autocomplete/sidebar
 // ============================================================================
 router.get('/list', async (req, res) => {
   try {
@@ -276,7 +298,7 @@ router.get('/list', async (req, res) => {
       .eq('analysis_type', 'full_valuation')
       .gt('expires_at', new Date().toISOString())
       .order('created_at', { ascending: false })
-      .limit(limit);
+      .limit(limit * 3);
 
     if (profile) {
       query = query.eq('best_profile_match', profile);
@@ -288,16 +310,7 @@ router.get('/list', async (req, res) => {
       return res.status(500).json({ error: 'List failed', message: error.message });
     }
 
-    // Deduplicate by ticker+profile (take most recent)
-    const seen = new Set();
-    const unique = [];
-    for (const row of (data || [])) {
-      const key = `${row.ticker}:${row.best_profile_match}`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        unique.push(row);
-      }
-    }
+    const unique = dedupByTickerProfile(data || []).slice(0, limit);
 
     res.json({
       count: unique.length,
@@ -310,14 +323,102 @@ router.get('/list', async (req, res) => {
 });
 
 // ============================================================================
+// HISTORY endpoint - all past analyses for a specific ticker
+// ============================================================================
+/**
+ * GET /api/analysis/:ticker/history?profile=G1&limit=20
+ *
+ * Returns the full history of analyses for a ticker (optionally filtered by profile).
+ * Useful for tracking how scores have evolved over time.
+ */
+router.get('/:ticker/history', async (req, res) => {
+  try {
+    const ticker = req.params.ticker?.toUpperCase();
+    const profile = req.query.profile;
+    const limit = Math.min(parseInt(req.query.limit) || 20, 100);
+    const include_expired = req.query.include_expired === 'true';
+
+    if (!ticker) {
+      return res.status(400).json({ error: 'Bad request', message: 'ticker is required' });
+    }
+
+    const supabase = getSupabase();
+    let query = supabase
+      .from('stocks_analysis_cache')
+      .select(`
+        id,
+        ticker,
+        best_profile_match,
+        quality_score,
+        recommendation,
+        backbone_tier,
+        type_classification,
+        s31_total,
+        yield_score,
+        speed_score,
+        duration_score,
+        confidence_score,
+        created_at,
+        expires_at
+      `)
+      .eq('ticker', ticker)
+      .eq('analysis_type', 'full_valuation')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (profile) {
+      if (!['C1', 'G1', 'M1', 'F1'].includes(profile)) {
+        return res.status(400).json({ error: 'Bad request', message: `Invalid profile: ${profile}` });
+      }
+      query = query.eq('best_profile_match', profile);
+    }
+
+    if (!include_expired) {
+      query = query.gt('expires_at', new Date().toISOString());
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('[analysis/history] query error:', error);
+      return res.status(500).json({ error: 'History query failed', message: error.message });
+    }
+
+    const flattened = (data || []).map(r => ({
+      id: r.id,
+      analyzed_at: r.created_at,
+      profile: r.best_profile_match,
+      overall_score: r.quality_score,
+      recommendation: r.recommendation,
+      backbone_tier: r.backbone_tier,
+      type_classification: r.type_classification,
+      s31_total: r.s31_total,
+      four_d: {
+        yield: r.yield_score,
+        speed: r.speed_score,
+        duration: r.duration_score,
+        confidence: r.confidence_score,
+      },
+      expires_at: r.expires_at,
+      is_expired: new Date(r.expires_at) < new Date(),
+    }));
+
+    res.json({
+      ticker,
+      profile: profile || 'all',
+      count: flattened.length,
+      history: flattened,
+    });
+  } catch (err) {
+    handleError(res, err);
+  }
+});
+
+// ============================================================================
 // FULL ANALYSIS endpoint - the 4-layer pipeline
 // ============================================================================
 /**
  * GET /api/analysis/:ticker?profile=G1&force_refresh=false
- *
- * Runs the full analysis pipeline for a stock.
- * If a recent cached result exists (TTL 4h), returns it instantly.
- * Set force_refresh=true to bypass cache.
  */
 router.get('/:ticker', async (req, res) => {
   try {
