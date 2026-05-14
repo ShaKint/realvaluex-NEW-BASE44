@@ -193,6 +193,23 @@ export async function getPriceTargetConsensus(ticker) {
   );
 }
 
+/**
+ * Get historical daily prices for the last N days.
+ * Cache key includes `days` so different windows are cached separately.
+ *
+ * @param {string} ticker
+ * @param {number} days - default 90
+ * @returns {Promise<Array<{date, close, volume}>>}
+ */
+export async function getHistoricalPrices(ticker, days = 90) {
+  return await fetchWithCache(
+    'historical-prices',
+    ticker,
+    { days },
+    () => getProvider().getHistoricalPrices(ticker, days)
+  );
+}
+
 export async function invalidateCache(ticker, endpoint) {
   const supabase = getSupabase();
   let query = supabase
@@ -213,6 +230,7 @@ export async function smokeTest(ticker = 'AAPL') {
     ['keyMetrics', () => getKeyMetricsTTM(ticker)],
     ['earnings', () => getEarningsHistory(ticker, 8)],
     ['priceTarget', () => getPriceTargetConsensus(ticker)],
+    ['historical', () => getHistoricalPrices(ticker, 90)],
   ];
   for (const [name, fn] of tests) {
     const start = Date.now();
@@ -222,7 +240,7 @@ export async function smokeTest(ticker = 'AAPL') {
         ok: true,
         durationMs: Date.now() - start,
         hasData: data !== null && data !== undefined,
-        sample: name === 'earnings' ? `${data?.length || 0} entries` : 'object',
+        sample: Array.isArray(data) ? `${data.length} entries` : 'object',
       };
     } catch (err) {
       results[name] = {
