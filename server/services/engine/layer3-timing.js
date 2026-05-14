@@ -2,7 +2,8 @@
  * @file Layer 3 - Timing Engine
  * @description "When and how much to buy?" → Speed Score 0-100 + Entry recommendation
  *
- * Covers Chapters: 2, 12, 17, 22-25
+ * UPDATE (3C-4+ optimization): layer2Output is now OPTIONAL.
+ * When running in parallel with L2, L3 receives null and uses only L1 context.
  *
  * Output: Hebrew JSON with Speed Score 0-100 + Entry recommendation.
  */
@@ -15,11 +16,10 @@ const SYSTEM_PROMPT = `אתה RealValueX™ Layer 3 - Timing Engine.
 
 עקרונות יסוד:
 
-1. **קונטקסט מ-Layer 1 ו-Layer 2** - תקבל את הניתוחים הקודמים.
+1. **קונטקסט מ-Layer 1** - תקבל את הניתוח הקודם.
    - מ-Layer 1: סוג ה-Opportunity, Backbone, חולשות, חוזקות
-   - מ-Layer 2: Confidence Score והאם החולשות מאוזנות
 
-2. **טיימינג שונה מאיכות.** מניה איכותית (Confidence 85) יכולה להיות בנקודת כניסה גרועה (Speed 30)
+2. **טיימינג שונה מאיכות.** מניה איכותית יכולה להיות בנקודת כניסה גרועה
    אם היא רק עלתה 200% והגיעה למצב Overbought.
 
 3. **טכניקאות חישוב Speed Score:**
@@ -113,13 +113,19 @@ function buildUserMessage({ ticker, profile, stockData, technicalIndicators, lay
     strengths: layer1Output.strengths,
   };
 
-  const layer2Context = {
-    confidence_score: layer2Output.confidence_score,
-    confidence_tier: layer2Output.confidence_tier,
-    validation_summary: layer2Output.validation_summary,
-    risk_assessment: layer2Output.risk_assessment,
-    weaknesses_resolution: layer2Output.weaknesses_resolution,
-  };
+  // Layer 2 context is optional (might be null in parallel mode)
+  const layer2Section = layer2Output ? `
+**Layer 2 (Validation):**
+\`\`\`json
+${JSON.stringify({
+  confidence_score: layer2Output.confidence_score,
+  confidence_tier: layer2Output.confidence_tier,
+  validation_summary: layer2Output.validation_summary,
+  risk_assessment: layer2Output.risk_assessment,
+  weaknesses_resolution: layer2Output.weaknesses_resolution,
+}, null, 2)}
+\`\`\`
+` : '';
 
   const cleanData = {
     quote: stripRaw(stockData.quote),
@@ -136,12 +142,7 @@ function buildUserMessage({ ticker, profile, stockData, technicalIndicators, lay
 \`\`\`json
 ${JSON.stringify(layer1Context, null, 2)}
 \`\`\`
-
-**Layer 2 (Validation):**
-\`\`\`json
-${JSON.stringify(layer2Context, null, 2)}
-\`\`\`
-
+${layer2Section}
 **אינדיקטורים טכניים:**
 \`\`\`json
 ${JSON.stringify(technicalIndicators, null, 2)}
@@ -169,9 +170,10 @@ JSON בלבד. ללא הקדמה. ללא markdown fence.`;
 }
 
 export async function runLayer3({ ticker, profile, stockData, technicalIndicators, layer1Output, layer2Output }) {
-  if (!ticker || !profile || !stockData || !technicalIndicators || !layer1Output || !layer2Output) {
-    throw new Error('runLayer3 requires all inputs');
+  if (!ticker || !profile || !stockData || !technicalIndicators || !layer1Output) {
+    throw new Error('runLayer3 requires ticker, profile, stockData, technicalIndicators, layer1Output');
   }
+  // layer2Output is optional (null when running in parallel with L2)
 
   const userMessage = buildUserMessage({
     ticker, profile, stockData, technicalIndicators, layer1Output, layer2Output
@@ -198,6 +200,7 @@ export async function runLayer3({ ticker, profile, stockData, technicalIndicator
     analyzed_at: new Date().toISOString(),
     model: MODELS.OPUS,
     technical_indicators_input: technicalIndicators,
+    ran_with_layer2_context: layer2Output !== null,
     ...json,
     usage,
   };
