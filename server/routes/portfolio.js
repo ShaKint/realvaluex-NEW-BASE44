@@ -214,13 +214,38 @@ router.get('/', async (req, res) => {
     const supabase = getSupabase();
     const userId = req.user.id;
 
-    const { data: holdings, error } = await supabase
-      .from('holdings')
-      .select('ticker, shares, avg_cost, sector, name')
+    // First, get the user's portfolio(s)
+    const { data: portfolios, error: pErr } = await supabase
+      .from('portfolios')
+      .select('id')
       .eq('user_id', userId);
 
+    if (pErr) {
+      console.error('[portfolio/get] portfolios query error:', pErr);
+      return res.status(500).json({
+        error: 'Database error',
+        message: pErr.message,
+      });
+    }
+
+    if (!portfolios || portfolios.length === 0) {
+      return res.json({
+        empty: true,
+        summary: { totalValue: 0, totalCost: 0, totalPnL: 0, totalPnLPct: 0, totalStocks: 0 },
+        message_he: 'אין פורטפוליו. צור פורטפוליו והוסף החזקות',
+      });
+    }
+
+    const portfolioIds = portfolios.map(p => p.id);
+
+    // Now get holdings for all user's portfolios
+    const { data: holdings, error } = await supabase
+      .from('holdings')
+      .select('ticker, quantity, avg_cost, sector, name')
+      .in('portfolio_id', portfolioIds);
+
     if (error) {
-      console.error('[portfolio/get] supabase error:', error);
+      console.error('[portfolio/get] holdings query error:', error);
       return res.status(500).json({
         error: 'Database error',
         message: error.message,
@@ -238,7 +263,7 @@ router.get('/', async (req, res) => {
     // Map DB schema to calculator format
     const mapped = holdings.map(h => ({
       ticker: h.ticker,
-      qty: h.shares,
+      qty: h.quantity,
       avgCost: h.avg_cost,
       sector: h.sector,
       name: h.name,
@@ -284,10 +309,31 @@ router.get('/health', async (req, res) => {
     const supabase = getSupabase();
     const userId = req.user.id;
 
+    // Get user's portfolios
+    const { data: portfolios, error: pErr } = await supabase
+      .from('portfolios')
+      .select('id')
+      .eq('user_id', userId);
+
+    if (pErr) {
+      return res.status(500).json({ error: 'Database error', message: pErr.message });
+    }
+
+    if (!portfolios || portfolios.length === 0) {
+      return res.json({
+        empty: true,
+        score: 0,
+        tier: 'Empty',
+        message_he: 'אין פורטפוליו',
+      });
+    }
+
+    const portfolioIds = portfolios.map(p => p.id);
+
     const { data: holdings, error } = await supabase
       .from('holdings')
-      .select('ticker, shares, avg_cost, sector')
-      .eq('user_id', userId);
+      .select('ticker, quantity, avg_cost, sector')
+      .in('portfolio_id', portfolioIds);
 
     if (error) {
       return res.status(500).json({ error: 'Database error', message: error.message });
@@ -304,7 +350,7 @@ router.get('/health', async (req, res) => {
 
     const mapped = holdings.map(h => ({
       ticker: h.ticker,
-      qty: h.shares,
+      qty: h.quantity,
       avgCost: h.avg_cost,
       sector: h.sector,
     }));
