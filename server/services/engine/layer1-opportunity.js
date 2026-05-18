@@ -31,6 +31,8 @@ const SYSTEM_PROMPT = `אתה RealValueX™ Layer 1 - Opportunity Engine.
 
 5. **JSON בלבד** - אל תוסיף הקדמה או סיום. רק האובייקט.
 
+6. **תמציתיות** - שמור על תיאורים קצרים (1-2 משפטים). מקסימום 3 weaknesses, 3 strengths, 4 positive_indicators, 4 negative_indicators.
+
 מודל הניתוח מבוסס על 6 פרקים:
 - פרק 1: שלב מחזור חיים (Development/Growth/Maturity/Decline)
 - פרק 7: X-Factor (TechLockIn/Scale/Ecosystem/DemandShock/Execution) + ה-verdict שלו
@@ -86,9 +88,9 @@ const OUTPUT_SCHEMA = `{
     "duration_signal": "high" | "medium" | "low"
   },
   "potential_energy_summary": "<בעברית, 1-2 משפטים: האם יש כאן Potential Energy ולמה>",
-  "positive_indicators": ["<בעברית, רשימת אינדיקטורים חיוביים>"],
-  "negative_indicators": ["<בעברית, אינדיקטורים שליליים - לציון בלבד, לא לפסילה>"],
-  "needs_attention": ["<בעברית, פריטים שדורשים בדיקה נוספת בשכבות הבאות>"]
+  "positive_indicators": ["<בעברית, רשימת אינדיקטורים חיוביים, עד 4>"],
+  "negative_indicators": ["<בעברית, אינדיקטורים שליליים - לציון בלבד, לא לפסילה, עד 4>"],
+  "needs_attention": ["<בעברית, פריטים שדורשים בדיקה נוספת בשכבות הבאות, עד 4>"]
 }`;
 
 // ============================================================================
@@ -131,6 +133,7 @@ ${JSON.stringify(cleanData, null, 2)}
 - **התאם לפרופיל ${profile}.** מה שמקובל ב-F1 לא מקובל ב-C1, ולהיפך
 - **בחר Backbone tier** מהסולם (Pure → Commodity)
 - **סווג TYPE** - A/B/C
+- **תמציתיות**: 1-2 משפטים לכל תיאור. מקסימום 3 weaknesses, 3 strengths.
 
 החזר אך ורק JSON שתואם בדיוק לסכימה הזו:
 \`\`\`
@@ -173,8 +176,8 @@ export async function runLayer1({ ticker, profile, stockData }) {
     model: MODELS.OPUS,
     system: SYSTEM_PROMPT,
     userMessage,
-    maxTokens: 4096,
-    temperature: 0.3,
+    maxTokens: 8000,
+    layerName: 'layer1-opportunity',
   });
 
   // Validate critical fields exist (defensive - LLMs sometimes skip fields)
