@@ -365,7 +365,7 @@ export function analyzePortfolio(holdings) {
   const totalValue = enriched.reduce((s, h) => s + h.value, 0);
   const totalCost = enriched.reduce((s, h) => s + h.cost, 0);
   const totalPnL = totalValue - totalCost;
-  const totalPnLPct = totalCost > 0 ? (totalPnL / totalCost) * 100 : 0;
+  const totalPnlPct = totalCost > 0 ? (totalPnL / totalCost) * 100 : 0;
 
   const winners = enriched.filter(h => h.pnl > 0);
   const losers = enriched.filter(h => h.pnl <= 0);
@@ -433,7 +433,7 @@ export function analyzePortfolio(holdings) {
       totalValue: Math.round(totalValue),
       totalCost: Math.round(totalCost),
       totalPnL: Math.round(totalPnL),
-      totalPnLPct: Math.round(totalPnLPct * 100) / 100,
+      totalPnLPct: Math.round(totalPnlPct * 100) / 100,
       totalStocks: enriched.length,
       winnersCount: winners.length,
       losersCount: losers.length,
