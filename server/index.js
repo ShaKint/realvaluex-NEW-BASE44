@@ -11,6 +11,7 @@ import newsRouter from './routes/news.js';
 import marketNewsRouter from './routes/market-news.js';
 import stocksRouter from './routes/stocks.js';
 import analysisRouter from './routes/analysis.js';
+import portfolioRouter from './routes/portfolio.js';
 
 const app = express();
 app.use(cors({
@@ -52,6 +53,7 @@ app.use('/api/news', requireAuth, newsRouter);
 app.use('/api/market-news', requireAuth, marketNewsRouter);
 app.use('/api/stocks', requireAuth, stocksRouter);
 app.use('/api/analysis', requireAuth, analysisRouter);
+app.use('/api/portfolio', requireAuth, portfolioRouter);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
