@@ -81,10 +81,11 @@ function enrichHolding(h) {
   const qty = Number(h.qty) || 0;
   const avgCost = Number(h.avgCost) || 0;
   const price = Number(h.price) || 0;
-  const value = qty * price;
+  const hasPrice = price > 0;
+  const value = hasPrice ? qty * price : qty * avgCost;  // fallback to cost basis if no live price
   const cost = qty * avgCost;
-  const pnl = value - cost;
-  const pnlPct = avgCost > 0 ? ((price - avgCost) / avgCost) * 100 : 0;
+  const pnl = hasPrice ? value - cost : 0;
+  const pnlPct = (hasPrice && avgCost > 0) ? ((price - avgCost) / avgCost) * 100 : 0;
 
   return {
     ticker: h.ticker,
@@ -97,6 +98,7 @@ function enrichHolding(h) {
     cost,
     pnl,
     pnlPct,
+    priceUnavailable: !hasPrice,  // mark stocks without live price (e.g. .TA stocks not in FMP Build plan)
   };
 }
 
@@ -359,7 +361,31 @@ export function analyzePortfolio(holdings) {
   }
 
   // 1. Enrich each holding
-  const enriched = holdings.map(enrichHolding);
+  const allEnriched = holdings.map(enrichHolding);
+
+  // Separate stocks with live prices from those without (e.g. .TA stocks)
+  const enriched = allEnriched.filter(h => !h.priceUnavailable);
+  const priceMissing = allEnriched.filter(h => h.priceUnavailable);
+
+  if (enriched.length === 0) {
+    // All stocks have no price - can't analyze
+    return {
+      empty: false,
+      priceUnavailableCount: priceMissing.length,
+      summary: { totalValue: 0, totalCost: 0, totalPnL: 0, totalPnLPct: 0, totalStocks: 0 },
+      healthScore: { score: 0, tier: 'Unknown', tier_he: 'לא ידוע', color: 'gray', breakdown: {} },
+      sectors: [],
+      concentration: {},
+      pareto: {},
+      topWinners: [],
+      topLosers: [],
+      deepLosses: [],
+      priceUnavailable: priceMissing.map(h => ({
+        ticker: h.ticker, name: h.name, sector: h.sector, qty: h.qty, avgCost: h.avgCost,
+      })),
+      warnings_he: [`${priceMissing.length} מניות ללא מחיר זמין מ-FMP - לא ניתן לנתח`],
+    };
+  }
 
   // 2. Summary stats
   const totalValue = enriched.reduce((s, h) => s + h.value, 0);
