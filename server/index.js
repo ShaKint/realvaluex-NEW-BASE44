@@ -12,14 +12,13 @@ import marketNewsRouter from './routes/market-news.js';
 import stocksRouter from './routes/stocks.js';
 import analysisRouter from './routes/analysis.js';
 import portfolioRouter from './routes/portfolio.js';
-
+import ciscoTestRouter from './routes/cisco-test.js';
 const app = express();
 app.use(cors({
   origin: (process.env.CORS_ORIGINS || '').split(',').filter(Boolean),
   credentials: true,
 }));
 app.use(express.json({ limit: '1mb' }));
-
 const supabaseAdmin = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY,
@@ -28,9 +27,7 @@ const supabaseAdmin = createClient(
     realtime: { transport: WebSocket },
   }
 );
-
 export const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
 export async function requireAuth(req, res, next) {
   try {
     const auth = req.headers.authorization || '';
@@ -44,9 +41,7 @@ export async function requireAuth(req, res, next) {
     res.status(401).json({ error: e.message });
   }
 }
-
 app.get('/health', (_, res) => res.json({ ok: true, ts: Date.now() }));
-
 app.use('/api/valuation', requireAuth, valuationRouter);
 app.use('/api/scanner', requireAuth, scannerRouter);
 app.use('/api/news', requireAuth, newsRouter);
@@ -54,7 +49,7 @@ app.use('/api/market-news', requireAuth, marketNewsRouter);
 app.use('/api/stocks', requireAuth, stocksRouter);
 app.use('/api/analysis', requireAuth, analysisRouter);
 app.use('/api/portfolio', requireAuth, portfolioRouter);
-
+app.use('/api/cisco-test', requireAuth, ciscoTestRouter);
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`[RealValueX backend] listening on :${PORT}`);
