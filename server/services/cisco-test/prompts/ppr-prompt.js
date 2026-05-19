@@ -1,169 +1,168 @@
 /**
- * @file PPR Block Orchestrator
+ * @file PPR Prompt Builder (Ch 37)
  *
- * Pipeline:
- *   1. gatherPPRData() via stock-data facade
- *   2. Build prompt
- *   3. Call Opus 4.7
- *   4. Parse JSON (with single retry on parse failure)
- *   5. Return structured result
+ * Builds the system + user prompts for the LLM call that scores PPR.
+ * Anchored directly to the 6 questions of Ch 37 in the
+ * RealValueX Master Operating Manual v1.0.
+ *
+ * The 4 Safeguards (E1-E4) are baked into the system prompt.
  */
-
-import { anthropic } from '../../../index.js';
-import { gatherPPRData } from '../data/ppr-data.js';
-import { PPR_SYSTEM_PROMPT, buildPPRUserPrompt } from '../prompts/ppr-prompt.js';
-
-const MODEL = 'claude-opus-4-7';
-const MAX_TOKENS = 4000;
 
 /**
- * Run PPR analysis for a single ticker.
- * @param {string} ticker
- * @returns {Promise<object>} full PPR result
+ * The system prompt — establishes the LLM's role and the 4 Safeguards.
+ * Written in Hebrew because all model documentation is Hebrew and the
+ * output verdicts must be in Hebrew per Shay's preference.
  */
-export async function analyzePPR(ticker) {
-  const startedAt = Date.now();
+export const PPR_SYSTEM_PROMPT = `אתה מנוע ניתוח של מערכת RealValueX™ Master Operating Manual v1.0.
+משימתך כעת: לענות על שאלות פרק 37 — Peak Pricing Risk (PPR), חלק מבחן Cisco.
 
-  // 1. Gather data
-  const data = await gatherPPRData(ticker);
+עקרון העל של המודל:
+Upside = Expansion Remaining − Crowding − Capital Cycle Saturation − Narrative Completion + Optionality
 
-  // 2. Build prompt
-  const userPrompt = buildPPRUserPrompt(data);
+PPR בודק מקרה ספציפי: מניה שכבר תמחרה את כל הסיפור (Crowding מקסימלי + Narrative Completion).
+זה הסיכון של Cisco 2000: חברה טובה במחיר נורא.
 
-  // 3. Call Opus
-  let llmResponse;
-  try {
-    llmResponse = await anthropic.messages.create({
-      model: MODEL,
-      max_tokens: MAX_TOKENS,
-      system: PPR_SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: userPrompt }],
-    });
-  } catch (err) {
-    console.error('[ppr] Opus call failed:', err.message);
-    return {
-      ticker: data.ticker,
-      stage: 'A',
-      block: 'ppr',
-      error: 'LLM call failed: ' + err.message,
-      data,
-      elapsedMs: Date.now() - startedAt,
-    };
-  }
+== 4 ה-Safeguards שאתה חייב לציית להם ==
 
-  // 4. Extract + parse JSON
-  const textContent =
-    llmResponse.content
-      ?.filter((c) => c.type === 'text')
-      .map((c) => c.text)
-      .join('\n') || '';
+E1 (Prediction Registry): התחזית שלך תישמר. אל תגיד "סביר" — תן הסתברות מספרית.
 
-  let parsed;
-  try {
-    parsed = parseJSONResponse(textContent);
-  } catch (err) {
-    // Retry once with explicit fix request
-    console.warn('[ppr] First JSON parse failed, retrying with fix instruction');
-    try {
-      const retryResponse = await anthropic.messages.create({
-        model: MODEL,
-        max_tokens: MAX_TOKENS,
-        system: PPR_SYSTEM_PROMPT,
-        messages: [
-          { role: 'user', content: userPrompt },
-          { role: 'assistant', content: textContent },
-          {
-            role: 'user',
-            content:
-              'התשובה הקודמת לא הצליחה להיות parsed כ-JSON תקני. אנא החזר אותו תוכן בדיוק, אבל הפעם JSON תקני וטהור בלבד, ללא backticks וללא טקסט נוסף.',
-          },
-        ],
-      });
-      const retryText =
-        retryResponse.content
-          ?.filter((c) => c.type === 'text')
-          .map((c) => c.text)
-          .join('\n') || '';
-      parsed = parseJSONResponse(retryText);
-    } catch (retryErr) {
-      return {
-        ticker: data.ticker,
-        stage: 'A',
-        block: 'ppr',
-        error: 'JSON parse failed after retry: ' + retryErr.message,
-        rawResponse: textContent,
-        data,
-        elapsedMs: Date.now() - startedAt,
-      };
-    }
-  }
+E2 (Base Rates): לכל טענה הסתברותית — תן Base Rate היסטורי. דוגמאות:
+- "מניות עם PE > 2× ממוצע 5-שנתי הניבו תשואה ממוצעת של X% בשנתיים הבאות"
+- "כאשר TTC > 5 שנים, ההסתברות לקריסה של 50%+ בעשור היא Y%"
+אם אתה לא יודע base rate מדויק — אמור "אין לי base rate מספרי לזה" ואל תמציא.
 
-  // 5. Validate basic shape
-  if (
-    !parsed ||
-    typeof parsed !== 'object' ||
-    !parsed.answers ||
-    !parsed.answers.q6_pprScore
-  ) {
-    return {
-      ticker: data.ticker,
-      stage: 'A',
-      block: 'ppr',
-      error: 'LLM response missing required fields',
-      rawResponse: textContent,
-      parsed,
-      data,
-      elapsedMs: Date.now() - startedAt,
-    };
-  }
+E3 (Honest Incompleteness): אם נתון חסר — תגיד מפורשות "אין לי נתון על זה" ותסביר איך זה משפיע על הציון. אל תכתוב "סביר להניח" ואל תנחש.
 
-  const score = parsed.answers.q6_pprScore.score;
-  const flag = parsed.flag || (score >= 7 ? 'red' : score >= 4 ? 'yellow' : 'green');
+E4 (Utility): כל ניתוח חייב להוביל לפעולה. תוצאת ה-PPR שלך משפיעה ישירות על החלטה: TRIM אם PPR > 7, MONITOR אם 4-7, HOLD אם < 4.
 
-  return {
-    ticker: data.ticker,
-    stage: 'A',
-    block: 'ppr',
-    chapter: 37,
-    score,
-    flag,
-    verdict_he: parsed.verdict_he || '',
-    actionHint_he: parsed.actionHint_he || '',
-    answers: parsed.answers,
-    baseRates_he: parsed.baseRates_he || [],
-    missingData_he: parsed.missingData_he || [],
-    rawData: data,
-    llm: {
-      model: MODEL,
-      inputTokens: llmResponse.usage?.input_tokens,
-      outputTokens: llmResponse.usage?.output_tokens,
-      stopReason: llmResponse.stop_reason,
+== הוראות פלט ==
+
+החזר JSON בלבד, ללא markdown fences, ללא טקסט סביב. מבנה:
+
+{
+  "answers": {
+    "q1_fairValueGap": {
+      "answer_he": "...",
+      "metric": <number or null>,
+      "confidence": "high" | "medium" | "low" | "none"
     },
-    elapsedMs: Date.now() - startedAt,
-    generatedAt: new Date().toISOString(),
-  };
+    "q2_bullCasePricedIn": { "answer_he": "...", "verdict": "yes" | "no" | "partial" | "unknown", "confidence": "..." },
+    "q3_ttc": { "answer_he": "...", "years": <number or null>, "confidence": "..." },
+    "q4_peakPricingRisk": { "answer_he": "...", "verdict": "yes" | "no" | "elevated" | "unknown", "confidence": "..." },
+    "q5_multipleExcess": { "answer_he": "...", "vsHistoricalRatio": <number or null>, "confidence": "..." },
+    "q6_pprScore": { "score": <integer 0-10>, "reasoning_he": "..." }
+  },
+  "baseRates_he": ["...", "..."],
+  "missingData_he": ["...", "..."],
+  "verdict_he": "<2-3 משפטים סיכום>",
+  "flag": "red" | "yellow" | "green",
+  "actionHint_he": "<פעולה ספציפית: TRIM / MONITOR / HOLD + תנאי>"
 }
 
+== חוקי דירוג PPR ==
+0-3: בטוח (green) — המחיר עוד לא תמחר את הסיפור
+4-6: יש סיכון (yellow) — חלק מהסיפור מתומחר, נדרש מעקב
+7-10: סיכון גבוה (red) — המחיר כבר תמחר את כל הסיפור או יותר (Cisco-style)
+
+flag חייב להיות עקבי עם הציון.`;
+
 /**
- * Tolerant JSON parsing — strips markdown fences if present, trims, parses.
+ * Build the user prompt for a specific ticker.
+ * @param {object} data - output of gatherPPRData()
  */
-function parseJSONResponse(text) {
-  if (!text || typeof text !== 'string') {
-    throw new Error('Empty or non-string response');
+export function buildPPRUserPrompt(data) {
+  const sections = [];
+
+  sections.push(`ניתוח PPR עבור: ${data.ticker} (${data.company.name || 'unknown name'})`);
+  sections.push(`סקטור: ${data.company.sector || 'unknown'} | תעשייה: ${data.company.industry || 'unknown'}`);
+  sections.push(`Market Cap: ${formatMaybe(data.company.marketCap, formatBn, '$')}`);
+  sections.push(`Beta: ${formatMaybe(data.company.beta, (v) => v.toFixed(2))}`);
+  sections.push('');
+
+  sections.push('=== מחיר נוכחי ויעד אנליסטים ===');
+  sections.push(`מחיר נוכחי: ${formatMaybe(data.price.current, (v) => '$' + v.toFixed(2))}`);
+  sections.push(`PT consensus אנליסטים: ${formatMaybe(data.analyst.priceTargetConsensus, (v) => '$' + v.toFixed(2))}`);
+  sections.push(
+    `Upside מ-PT: ${
+      data.analyst.upsidePct !== null
+        ? data.analyst.upsidePct.toFixed(1) + '%' +
+          (data.analyst.upsidePct < 0 ? ' (מחיר מעל ה-PT — premium)' : '')
+        : 'לא ידוע'
+    }`
+  );
+  sections.push('');
+
+  sections.push('=== מכפילי תמחור ===');
+  sections.push(`P/E (TTM): ${formatMaybe(data.multiples.peTTM, (v) => v.toFixed(1))}`);
+  sections.push(`P/S (TTM): ${formatMaybe(data.multiples.psTTM, (v) => v.toFixed(1))}`);
+  sections.push(`P/FCF (TTM): ${formatMaybe(data.multiples.pfcfTTM, (v) => v.toFixed(1))}`);
+  sections.push(`EV/EBITDA (TTM): ${formatMaybe(data.multiples.evToEbitdaTTM, (v) => v.toFixed(1))}`);
+  sections.push(`PEG (TTM): ${formatMaybe(data.multiples.pegTTM, (v) => v.toFixed(2))}`);
+  sections.push(
+    data.multiples.historicalAverages === null
+      ? '*** ממוצעים היסטוריים: אין נתון זמין במערכת כרגע — נדרש להוסיף בשלב B ***'
+      : `ממוצעים היסטוריים 5-שנתיים: ${JSON.stringify(data.multiples.historicalAverages)}`
+  );
+  sections.push('');
+
+  sections.push('=== צמיחת פונדמנטלים אחרונה (8 רבעונים, YoY proxy) ===');
+  sections.push(
+    `Revenue Growth YoY: ${
+      data.growth.recentRevenueGrowthPctYoY !== null
+        ? data.growth.recentRevenueGrowthPctYoY.toFixed(1) + '%'
+        : 'לא ידוע'
+    }`
+  );
+  sections.push(
+    `EPS Growth YoY: ${
+      data.growth.recentEpsGrowthPctYoY !== null
+        ? data.growth.recentEpsGrowthPctYoY.toFixed(1) + '%'
+        : 'לא ידוע'
+    }`
+  );
+  sections.push('');
+
+  if (data.derived.ttcYears !== null) {
+    sections.push('=== חישוב TTC מוקדם (לעיון בלבד — אמת לבד) ===');
+    sections.push(`TTC משוער: ${data.derived.ttcYears.toFixed(1)} שנים`);
+    sections.push(`שיטה: ${data.derived._ttcMethod}`);
+    sections.push('');
   }
-  let cleaned = text.trim();
 
-  // Strip ```json ... ``` fences if present
-  const fenceMatch = cleaned.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```\s*$/);
-  if (fenceMatch) cleaned = fenceMatch[1].trim();
-
-  // Find first { and last }
-  const firstBrace = cleaned.indexOf('{');
-  const lastBrace = cleaned.lastIndexOf('}');
-  if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {
-    throw new Error('No JSON object boundaries found');
+  if (data._missing.length > 0) {
+    sections.push('=== נתונים חסרים ===');
+    sections.push(data._missing.map((f) => `- ${f}`).join('\n'));
+    sections.push('');
   }
-  cleaned = cleaned.slice(firstBrace, lastBrace + 1);
 
-  return JSON.parse(cleaned);
+  if (data._errors.length > 0) {
+    sections.push('=== שגיאות בשליפה ===');
+    sections.push(data._errors.map((e) => `- ${e.field}: ${e.message}`).join('\n'));
+    sections.push('');
+  }
+
+  sections.push('=== המשימה ===');
+  sections.push('ענה על 6 שאלות פרק 37 מהמודל:');
+  sections.push('Q1: מה הפער בין מחיר הנוכחי למחיר Fair Value? (השתמש ב-PT consensus כעוגן)');
+  sections.push('Q2: אם החברה כבר מתומחרת לפי Bull Case — האם יש עוד upside?');
+  sections.push('Q3: מה Time-To-Catch-Up (TTC) — כמה זמן ייקח לפונדמנטלים להגיע למחיר?');
+  sections.push('Q4: אם TTC > 5 שנים — האם המניה ב-Peak Pricing Risk?');
+  sections.push('Q5: מה Multiple Excess (כמה מעל Historical Average)? — אם אין נתון, אמור מפורשות');
+  sections.push('Q6: מה ציון PPR (0-10)? תן ציון אחד מספרי + הסבר');
+  sections.push('');
+  sections.push('החזר JSON בלבד לפי הסכמה שהוגדרה במערכת.');
+
+  return sections.join('\n');
+}
+
+function formatMaybe(v, fmt, prefix = '') {
+  if (v === null || v === undefined) return 'לא ידוע';
+  return prefix + fmt(v);
+}
+
+function formatBn(v) {
+  const abs = Math.abs(v);
+  if (abs >= 1_000_000_000) return (v / 1_000_000_000).toFixed(2) + 'B';
+  if (abs >= 1_000_000) return (v / 1_000_000).toFixed(1) + 'M';
+  return String(v);
 }
