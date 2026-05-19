@@ -1,67 +1,169 @@
 /**
- * @file Cisco Test Router
+ * @file PPR Block Orchestrator
  *
- * Stage A (current): PPR only — Ch 37
- * Stage B: + RTA (Ch 38)
- * Stage C: + TPS (Ch 39)
- * Stage D: Cisco Test synthesizer + red/yellow/green flag
- * Stages E-H: 6 Asymmetry Layers + State Classifier + Action + Safeguards
- *
- * Mounted at /api/cisco-test in index.js with requireAuth.
+ * Pipeline:
+ *   1. gatherPPRData() via stock-data facade
+ *   2. Build prompt
+ *   3. Call Opus 4.7
+ *   4. Parse JSON (with single retry on parse failure)
+ *   5. Return structured result
  */
 
-import { Router } from 'express';
-import { analyzePPR } from '../services/cisco-test/blocks/ppr.js';
+import { anthropic } from '../../../index.js';
+import { gatherPPRData } from '../data/ppr-data.js';
+import { PPR_SYSTEM_PROMPT, buildPPRUserPrompt } from '../prompts/ppr-prompt.js';
 
-const router = Router();
+const MODEL = 'claude-opus-4-7';
+const MAX_TOKENS = 4000;
 
 /**
- * GET /api/cisco-test/:ticker
- *
- * Returns PPR-only result during Stage A.
- * Will be extended in future stages.
+ * Run PPR analysis for a single ticker.
+ * @param {string} ticker
+ * @returns {Promise<object>} full PPR result
  */
-router.get('/:ticker', async (req, res) => {
-  const { ticker } = req.params;
+export async function analyzePPR(ticker) {
+  const startedAt = Date.now();
 
-  if (!ticker || ticker.length > 12) {
-    return res.status(400).json({ error: 'Invalid ticker' });
-  }
+  // 1. Gather data
+  const data = await gatherPPRData(ticker);
 
+  // 2. Build prompt
+  const userPrompt = buildPPRUserPrompt(data);
+
+  // 3. Call Opus
+  let llmResponse;
   try {
-    const ppr = await analyzePPR(ticker);
-
-    return res.json({
-      ticker: ticker.toUpperCase(),
-      stage: 'A',
-      stageNote: 'Stage A: PPR (Ch 37) only. RTA, TPS, Asymmetry Layers, and State Classifier pending.',
-      ppr,
-      generatedAt: new Date().toISOString(),
+    llmResponse = await anthropic.messages.create({
+      model: MODEL,
+      max_tokens: MAX_TOKENS,
+      system: PPR_SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: userPrompt }],
     });
   } catch (err) {
-    console.error('[cisco-test] Failed for', ticker, ':', err);
-    return res.status(500).json({
-      error: 'Cisco test analysis failed',
-      message: err.message,
-      ticker,
-    });
+    console.error('[ppr] Opus call failed:', err.message);
+    return {
+      ticker: data.ticker,
+      stage: 'A',
+      block: 'ppr',
+      error: 'LLM call failed: ' + err.message,
+      data,
+      elapsedMs: Date.now() - startedAt,
+    };
   }
-});
+
+  // 4. Extract + parse JSON
+  const textContent =
+    llmResponse.content
+      ?.filter((c) => c.type === 'text')
+      .map((c) => c.text)
+      .join('\n') || '';
+
+  let parsed;
+  try {
+    parsed = parseJSONResponse(textContent);
+  } catch (err) {
+    // Retry once with explicit fix request
+    console.warn('[ppr] First JSON parse failed, retrying with fix instruction');
+    try {
+      const retryResponse = await anthropic.messages.create({
+        model: MODEL,
+        max_tokens: MAX_TOKENS,
+        system: PPR_SYSTEM_PROMPT,
+        messages: [
+          { role: 'user', content: userPrompt },
+          { role: 'assistant', content: textContent },
+          {
+            role: 'user',
+            content:
+              'התשובה הקודמת לא הצליחה להיות parsed כ-JSON תקני. אנא החזר אותו תוכן בדיוק, אבל הפעם JSON תקני וטהור בלבד, ללא backticks וללא טקסט נוסף.',
+          },
+        ],
+      });
+      const retryText =
+        retryResponse.content
+          ?.filter((c) => c.type === 'text')
+          .map((c) => c.text)
+          .join('\n') || '';
+      parsed = parseJSONResponse(retryText);
+    } catch (retryErr) {
+      return {
+        ticker: data.ticker,
+        stage: 'A',
+        block: 'ppr',
+        error: 'JSON parse failed after retry: ' + retryErr.message,
+        rawResponse: textContent,
+        data,
+        elapsedMs: Date.now() - startedAt,
+      };
+    }
+  }
+
+  // 5. Validate basic shape
+  if (
+    !parsed ||
+    typeof parsed !== 'object' ||
+    !parsed.answers ||
+    !parsed.answers.q6_pprScore
+  ) {
+    return {
+      ticker: data.ticker,
+      stage: 'A',
+      block: 'ppr',
+      error: 'LLM response missing required fields',
+      rawResponse: textContent,
+      parsed,
+      data,
+      elapsedMs: Date.now() - startedAt,
+    };
+  }
+
+  const score = parsed.answers.q6_pprScore.score;
+  const flag = parsed.flag || (score >= 7 ? 'red' : score >= 4 ? 'yellow' : 'green');
+
+  return {
+    ticker: data.ticker,
+    stage: 'A',
+    block: 'ppr',
+    chapter: 37,
+    score,
+    flag,
+    verdict_he: parsed.verdict_he || '',
+    actionHint_he: parsed.actionHint_he || '',
+    answers: parsed.answers,
+    baseRates_he: parsed.baseRates_he || [],
+    missingData_he: parsed.missingData_he || [],
+    rawData: data,
+    llm: {
+      model: MODEL,
+      inputTokens: llmResponse.usage?.input_tokens,
+      outputTokens: llmResponse.usage?.output_tokens,
+      stopReason: llmResponse.stop_reason,
+    },
+    elapsedMs: Date.now() - startedAt,
+    generatedAt: new Date().toISOString(),
+  };
+}
 
 /**
- * GET /api/cisco-test/_meta/health
+ * Tolerant JSON parsing — strips markdown fences if present, trims, parses.
  */
-router.get('/_meta/health', (req, res) => {
-  res.json({
-    ok: true,
-    service: 'cisco-test',
-    stage: 'A',
-    chapters_active: [37],
-    chapters_pending: [38, 39],
-    layers_pending: ['L1', 'L2', 'L3', 'L4', 'L5', 'L6'],
-    state_classifier: 'pending',
-    ts: Date.now(),
-  });
-});
+function parseJSONResponse(text) {
+  if (!text || typeof text !== 'string') {
+    throw new Error('Empty or non-string response');
+  }
+  let cleaned = text.trim();
 
-export default router;
+  // Strip ```json ... ``` fences if present
+  const fenceMatch = cleaned.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```\s*$/);
+  if (fenceMatch) cleaned = fenceMatch[1].trim();
+
+  // Find first { and last }
+  const firstBrace = cleaned.indexOf('{');
+  const lastBrace = cleaned.lastIndexOf('}');
+  if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {
+    throw new Error('No JSON object boundaries found');
+  }
+  cleaned = cleaned.slice(firstBrace, lastBrace + 1);
+
+  return JSON.parse(cleaned);
+}
